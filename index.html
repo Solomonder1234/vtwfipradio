@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ERN — EAS Relay Network (VTWF) | Emergency Broadcast Dashboard</title>
+  <meta name="description" content="EAS Relay Network (ERN / VTWF) — 24/7 emergency alert relay broadcasting from New York City." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'ern-dark': '#0f172a',
+            'ern-surface': '#1e293b',
+            'ern-border': '#334155',
+            'ern-green': '#22c55e',
+            'ern-amber': '#f59e0b',
+            'ern-red': '#ef4444',
+          },
+          fontFamily: { 'mono': ['JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes pulse-red { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
+    .pulse-red { animation: pulse-red 1.5s ease-in-out infinite; }
+    @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); } 50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); } }
+    .pulse-green { animation: pulse-green 2s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .blink { animation: blink 1s step-start infinite; }
+    .scanline { background: repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px); }
+    input[type="range"] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: #334155; outline: none; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #22c55e; cursor: pointer; box-shadow: 0 0 8px rgba(34,197,94,0.5); }
+    input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #22c55e; cursor: pointer; border: none; }
+    .log-row:hover { background: rgba(34,197,94,0.05); }
+    .log-row { transition: background 0.15s; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+  </style>
+</head>
+<body class="bg-ern-dark text-slate-200 min-h-screen">
+  <header class="sticky top-0 z-50 bg-ern-surface/95 backdrop-blur border-b border-ern-border scanline">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-ern-red to-red-700 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-red-900/30">ERN</div>
+          <div><h1 class="text-base sm:text-lg font-bold text-white leading-tight">EAS Relay Network</h1><p class="text-xs text-slate-400 font-mono">ERN / VTWF &mdash; New York City</p></div>
+        </div>
+        <nav class="flex items-center gap-1 sm:gap-2">
+          <a href="/" class="px-3 py-1.5 text-sm font-medium text-ern-green rounded-lg bg-ern-green/10">Dashboard</a>
+          <a href="/announcements.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Announcements</a>
+          <a href="/login.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Admin</a>
+        </nav>
+      </div>
+      <div class="flex items-center justify-between py-2 border-t border-ern-border/50 flex-wrap gap-2">
+        <div class="flex items-center gap-3">
+          <div id="status-badge" class="flex items-center gap-2 px-3 py-1 rounded-full bg-ern-green/10 border border-ern-green/30">
+            <span class="w-2.5 h-2.5 rounded-full bg-ern-green pulse-green"></span>
+            <span id="status-text" class="text-xs font-bold text-ern-green uppercase tracking-wider">All Systems Operational</span>
+          </div>
+          <span class="hidden sm:inline text-xs text-slate-500 font-mono">|</span>
+          <span class="hidden sm:inline text-xs text-slate-400 font-mono">Broadcasting 24/7</span>
+        </div>
+        <div class="flex items-center gap-4 font-mono text-xs">
+          <div class="text-right"><span class="text-slate-500">LOCAL</span><span id="local-clock" class="text-slate-200 ml-1.5">--:--:--</span></div>
+          <div class="text-right"><span class="text-slate-500">UTC</span><span id="utc-clock" class="text-slate-200 ml-1.5">--:--:--</span></div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div id="emergency-banner" class="bg-ern-green/10 border-b border-ern-green/30 transition-all duration-500">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
+      <div class="flex items-center gap-3">
+        <div id="banner-icon" class="flex-shrink-0 w-8 h-8 rounded-lg bg-ern-green/20 flex items-center justify-center">
+          <svg class="w-5 h-5 text-ern-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="flex-1 overflow-hidden">
+          <p id="banner-text" class="text-sm font-medium text-ern-green"><span class="font-bold uppercase tracking-wider">Normal Broadcast</span> &mdash; No active alerts. Monitoring all EAS channels.</p>
+        </div>
+        <span id="banner-time" class="hidden sm:block text-xs font-mono text-slate-500 flex-shrink-0"></span>
+      </div>
+    </div>
+  </div>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <section class="bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl">
+      <div class="px-5 py-3 border-b border-ern-border flex items-center justify-between">
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-ern-red blink"></span><h2 class="text-sm font-bold text-white uppercase tracking-wider">Live Stream</h2></div>
+        <span class="text-xs font-mono text-slate-500">ERN-VTWF Relay</span>
+      </div>
+      <div class="p-5">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Now Playing</p>
+            <p id="now-playing" class="text-lg font-semibold text-white">ERN-VTWF &mdash; Live Relay</p>
+            <p id="now-playing-sub" class="text-sm text-slate-400">Monitoring emergency alert channels</p>
+          </div>
+          <div id="stream-status" class="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-700/50">
+            <span class="w-2 h-2 rounded-full bg-slate-500" id="stream-dot"></span>
+            <span id="stream-status-text" class="text-xs font-medium text-slate-400">Connecting...</span>
+          </div>
+        </div>
+        <div class="bg-ern-dark rounded-xl p-4 border border-ern-border/50">
+          <audio id="audio-player" preload="none">
+            <source src="https://icecast.gwes-eas.network/ERN-VTWF" type="audio/mpeg" />
+            <source src="https://icecast.gwes-eas.network/ERN-VTWF" type="audio/aac" />
+          </audio>
+          <div class="flex items-center gap-3 sm:gap-4">
+            <button id="play-btn" class="flex-shrink-0 w-12 h-12 rounded-full bg-ern-green hover:bg-green-500 flex items-center justify-center transition shadow-lg shadow-green-900/30">
+              <svg id="play-icon" class="w-6 h-6 text-ern-dark" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="pause-icon" class="w-6 h-6 text-ern-dark hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+            <button id="mute-btn" class="flex-shrink-0 w-10 h-10 rounded-lg bg-slate-700/50 hover:bg-slate-700 flex items-center justify-center transition">
+              <svg id="vol-icon" class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M17.95 6.05a8 8 0 010 11.9M5 9v6h4l5 4V5L9 9H5z"/></svg>
+              <svg id="mute-icon" class="w-5 h-5 text-slate-300 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 9v6h4l5 4V5L9 9H5zm11-1l4 4m0-4l-4 4"/></svg>
+            </button>
+            <div class="flex items-center gap-2 flex-1 min-w-[100px]">
+              <input type="range" id="volume-slider" min="0" max="100" value="75" class="flex-1" />
+              <span id="volume-text" class="text-xs font-mono text-slate-400 w-8 text-right">75%</span>
+            </div>
+            <a href="https://icecast.gwes-eas.network/ERN-VTWF" target="_blank" rel="noopener" class="flex-shrink-0 hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-xs text-slate-300 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>Direct
+            </a>
+          </div>
+        </div>
+        <div class="mt-4 rounded-xl overflow-hidden border border-ern-border/50 bg-ern-dark">
+          <iframe src="https://icecast.gwes-eas.network/ERN-VTWF" title="ERN Icecast Stream" loading="lazy" class="w-full h-[200px] border-none block"></iframe>
+        </div>
+      </div>
+    </section>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <section class="lg:col-span-2 bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl">
+        <div class="px-5 py-3 border-b border-ern-border flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-ern-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            <h2 class="text-sm font-bold text-white uppercase tracking-wider">Alert Transmission Log</h2>
+          </div>
+          <span class="text-xs font-mono text-slate-500">Recent Network Transmissions</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-ern-dark/50 border-b border-ern-border">
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Timestamp</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Event</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Originator</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:table-cell">FIPS / Area</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody id="log-table-body"></tbody>
+          </table>
+        </div>
+        <div class="px-4 py-2.5 border-t border-ern-border flex items-center justify-between">
+          <span id="log-count" class="text-xs font-mono text-slate-500">0 transmissions logged</span>
+          <button id="refresh-log" class="text-xs text-ern-green hover:text-green-400 font-medium transition flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Refresh
+          </button>
+        </div>
+      </section>
+      <section class="space-y-6">
+        <div class="bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl">
+          <div class="px-5 py-3 border-b border-ern-border flex items-center gap-2">
+            <svg class="w-4 h-4 text-ern-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <h2 class="text-sm font-bold text-white uppercase tracking-wider">Schedule</h2>
+          </div>
+          <div class="p-5 space-y-4">
+            <div class="bg-ern-dark rounded-xl p-4 border border-ern-border/50">
+              <div class="flex items-center gap-2 mb-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-ern-green/20 text-ern-green font-mono">RWT</span><span class="text-sm font-semibold text-white">Required Weekly Test</span></div>
+              <p class="text-xs text-slate-400 leading-relaxed">Every Wednesday<br/><span class="text-slate-300 font-medium">11:59 AM &ndash; 1:59 PM EST</span></p>
+            </div>
+            <div class="bg-ern-dark rounded-xl p-4 border border-ern-border/50">
+              <div class="flex items-center gap-2 mb-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-ern-amber/20 text-ern-amber font-mono">RMT</span><span class="text-sm font-semibold text-white">Required Monthly Test</span></div>
+              <p class="text-xs text-slate-400 leading-relaxed">First full week of each month<br/><span class="text-slate-300 font-medium">8:30 AM &ndash; 8:30 PM EST</span></p>
+            </div>
+            <div class="bg-ern-dark rounded-xl p-4 border border-ern-border/50">
+              <div class="flex items-center gap-2 mb-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-ern-red/20 text-ern-red font-mono">24/7</span><span class="text-sm font-semibold text-white">Continuous Monitoring</span></div>
+              <p class="text-xs text-slate-400 leading-relaxed">Live relay stream active at all times for real-time alert reception.</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl">
+          <div class="px-5 py-3 border-b border-ern-border flex items-center gap-2">
+            <svg class="w-4 h-4 text-ern-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            <h2 class="text-sm font-bold text-white uppercase tracking-wider">Affiliate Encoder Info</h2>
+          </div>
+          <div class="p-5 space-y-3">
+            <div><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">DASDEC Encoder</p><p class="text-sm text-slate-200 font-mono">IP: <span class="text-ern-green">10.0.0.1</span> &mdash; Port: <span class="text-ern-green">5004</span></p><p class="text-xs text-slate-400 mt-1">Monitor source: ERN-VTWF relay stream</p></div>
+            <div class="border-t border-ern-border/50 pt-3"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Sage ENDEC</p><p class="text-sm text-slate-200 font-mono">IP: <span class="text-ern-green">10.0.0.2</span> &mdash; Port: <span class="text-ern-green">5004</span></p><p class="text-xs text-slate-400 mt-1">Audio feed via Icecast relay</p></div>
+            <div class="border-t border-ern-border/50 pt-3"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Stream Source</p><p class="text-sm text-slate-200 font-mono break-all">icecast.gwes-eas.network/ERN-VTWF</p><p class="text-xs text-slate-400 mt-1">GWES EAS Network</p></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <section class="bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl">
+      <div class="px-5 py-3 border-b border-ern-border flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-ern-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider">Station Script Library</h2>
+        </div>
+        <span class="text-xs font-mono text-slate-500">Broadcast Reference Scripts</span>
+      </div>
+      <div class="p-5 space-y-3">
+        <div class="bg-ern-dark rounded-xl border border-ern-border/50 overflow-hidden">
+          <button class="script-tab w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-800/50 transition" data-target="pre-alert-script">
+            <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-ern-amber/20 text-ern-amber font-mono">PRE</span><span class="text-sm font-semibold text-white">30-Second Branded Pre-Alert Script</span></div>
+            <svg class="w-5 h-5 text-slate-400 chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="pre-alert-script" class="hidden px-4 pb-4">
+            <div class="bg-slate-950/50 rounded-lg p-4 border border-ern-border/30">
+              <p class="text-sm text-slate-300 leading-relaxed italic">"This is an official priority transmission from the EAS Relay Network and VTWF relay operations. Stand by for emergency alert information. Do not adjust your receiver. This is a test of the Emergency Alert System relay network. This is only a test."</p>
+              <div class="flex items-center gap-2 mt-3">
+                <button class="copy-script text-xs text-ern-green hover:text-green-400 font-medium flex items-center gap-1 transition" data-target="pre-alert-script">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Copy
+                </button>
+                <span class="text-xs text-slate-600">~30 sec read time</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-ern-dark rounded-xl border border-ern-border/50 overflow-hidden">
+          <button class="script-tab w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-800/50 transition" data-target="post-alert-script">
+            <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-ern-green/20 text-ern-green font-mono">POST</span><span class="text-sm font-semibold text-white">30-Second Branded Post-Alert Script</span></div>
+            <svg class="w-5 h-5 text-slate-400 chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="post-alert-script" class="hidden px-4 pb-4">
+            <div class="bg-slate-950/50 rounded-lg p-4 border border-ern-border/30">
+              <p class="text-sm text-slate-300 leading-relaxed italic">"This concludes the priority emergency transmission from the EAS Relay Network and VTWF relay operations. Normal programming will resume. You may now resume regular monitoring. This has been a broadcast of the EAS Relay Network. Thank you for listening."</p>
+              <div class="flex items-center gap-2 mt-3">
+                <button class="copy-script text-xs text-ern-green hover:text-green-400 font-medium flex items-center gap-1 transition" data-target="post-alert-script">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Copy
+                </button>
+                <span class="text-xs text-slate-600">~30 sec read time</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-ern-dark rounded-xl border border-ern-border/50 overflow-hidden">
+          <button class="script-tab w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-800/50 transition" data-target="tts-prompt-script">
+            <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400 font-mono">TTS</span><span class="text-sm font-semibold text-white">Script TTS Prompt Template</span></div>
+            <svg class="w-5 h-5 text-slate-400 chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="tts-prompt-script" class="hidden px-4 pb-4">
+            <div class="bg-slate-950/50 rounded-lg p-4 border border-ern-border/30">
+              <p class="text-sm text-slate-300 leading-relaxed italic font-mono">"This is an official transmission from the EAS Relay Network and VTWF. The following is a %EVENT_NAME% issued for the following counties: %COUNTY_LIST%. %MESSAGE_TEXT% This concludes this transmission from the ERN and VTWF network."</p>
+              <div class="flex items-center gap-2 mt-3">
+                <button class="copy-script text-xs text-ern-green hover:text-green-400 font-medium flex items-center gap-1 transition" data-target="tts-prompt-script">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Copy
+                </button>
+                <span class="text-xs text-slate-600">Variables: %EVENT_NAME%, %COUNTY_LIST%, %MESSAGE_TEXT%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-4"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Location</p><p class="text-sm font-semibold text-white">New York City, NY</p></div>
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-4"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Station ID</p><p class="text-sm font-semibold text-white font-mono">ERN-VTWF</p></div>
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-4"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Network</p><p class="text-sm font-semibold text-white">GWES EAS Network</p></div>
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-4"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Status</p><p id="info-status" class="text-sm font-semibold text-ern-green">Operational</p></div>
+    </section>
+  </main>
+  <footer class="bg-ern-surface border-t border-ern-border mt-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
+      <p class="text-sm text-slate-400">EAS Relay Network (ERN) &mdash; Broadcasting from New York City, New York</p>
+      <p class="text-sm font-semibold text-slate-300 mt-1">&copy; 2026 ERN / EAS Relay Network. All rights reserved.</p>
+    </div>
+  </footer>
+  <script>
+    function updateClocks() { const now = new Date(); document.getElementById('local-clock').textContent = now.toLocaleTimeString('en-US', { hour12: false }); document.getElementById('utc-clock').textContent = now.toUTCString().split(' ')[4]; }
+    updateClocks(); setInterval(updateClocks, 1000);
+    const audio = document.getElementById('audio-player'); const playBtn = document.getElementById('play-btn'); const playIcon = document.getElementById('play-icon'); const pauseIcon = document.getElementById('pause-icon'); const muteBtn = document.getElementById('mute-btn'); const volIcon = document.getElementById('vol-icon'); const muteIcon = document.getElementById('mute-icon'); const volumeSlider = document.getElementById('volume-slider'); const volumeText = document.getElementById('volume-text'); const streamDot = document.getElementById('stream-dot'); const streamStatusText = document.getElementById('stream-status-text'); const nowPlaying = document.getElementById('now-playing'); const nowPlayingSub = document.getElementById('now-playing-sub');
+    audio.volume = 0.75;
+    playBtn.addEventListener('click', () => { if (audio.paused) { audio.play(); } else { audio.pause(); } });
+    audio.addEventListener('play', () => { playIcon.classList.add('hidden'); pauseIcon.classList.remove('hidden'); playBtn.classList.remove('bg-ern-green'); playBtn.classList.add('bg-ern-amber'); streamDot.classList.remove('bg-slate-500'); streamDot.classList.add('bg-ern-green'); streamStatusText.textContent = 'Live'; streamStatusText.classList.remove('text-slate-400'); streamStatusText.classList.add('text-ern-green'); nowPlaying.textContent = 'ERN-VTWF — Broadcasting Live'; nowPlayingSub.textContent = 'Streaming emergency alert relay'; });
+    audio.addEventListener('pause', () => { playIcon.classList.remove('hidden'); pauseIcon.classList.add('hidden'); playBtn.classList.add('bg-ern-green'); playBtn.classList.remove('bg-ern-amber'); streamDot.classList.remove('bg-ern-green'); streamDot.classList.add('bg-slate-500'); streamStatusText.textContent = 'Paused'; streamStatusText.classList.remove('text-ern-green'); streamStatusText.classList.add('text-slate-400'); nowPlaying.textContent = 'ERN-VTWF — Live Relay'; nowPlayingSub.textContent = 'Stream paused'; });
+    audio.addEventListener('error', () => { streamDot.classList.remove('bg-ern-green'); streamDot.classList.add('bg-ern-red'); streamStatusText.textContent = 'Stream Error'; streamStatusText.classList.remove('text-ern-green'); streamStatusText.classList.add('text-ern-red'); });
+    audio.addEventListener('waiting', () => { streamStatusText.textContent = 'Buffering...'; });
+    muteBtn.addEventListener('click', () => { audio.muted = !audio.muted; if (audio.muted) { volIcon.classList.add('hidden'); muteIcon.classList.remove('hidden'); } else { volIcon.classList.remove('hidden'); muteIcon.classList.add('hidden'); } });
+    volumeSlider.addEventListener('input', (e) => { const vol = e.target.value; audio.volume = vol / 100; audio.muted = vol == 0; volumeText.textContent = vol + '%'; if (vol == 0) { volIcon.classList.add('hidden'); muteIcon.classList.remove('hidden'); } else { volIcon.classList.remove('hidden'); muteIcon.classList.add('hidden'); } });
+    document.querySelectorAll('.script-tab').forEach(btn => { btn.addEventListener('click', () => { const target = document.getElementById(btn.dataset.target); const chevron = btn.querySelector('.chevron'); target.classList.toggle('hidden'); chevron.classList.toggle('rotate-180'); }); });
+    document.querySelectorAll('.copy-script').forEach(btn => { btn.addEventListener('click', () => { const target = document.getElementById(btn.dataset.target); const text = target.querySelector('p').textContent; navigator.clipboard.writeText(text).then(() => { const original = btn.innerHTML; btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!'; setTimeout(() => { btn.innerHTML = original; }, 2000); }); }); });
+    let alertActive = false; const bannerEl = document.getElementById('emergency-banner'); const bannerIcon = document.getElementById('banner-icon'); const bannerText = document.getElementById('banner-text'); const bannerTime = document.getElementById('banner-time'); const statusBadge = document.getElementById('status-badge'); const statusText = document.getElementById('status-text'); const infoStatus = document.getElementById('info-status');
+    function setNormalState() { alertActive = false; bannerEl.className = 'bg-ern-green/10 border-b border-ern-green/30 transition-all duration-500'; bannerIcon.className = 'flex-shrink-0 w-8 h-8 rounded-lg bg-ern-green/20 flex items-center justify-center'; bannerIcon.innerHTML = '<svg class="w-5 h-5 text-ern-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'; bannerText.className = 'text-sm font-medium text-ern-green'; bannerText.innerHTML = '<span class="font-bold uppercase tracking-wider">Normal Broadcast</span> &mdash; No active alerts. Monitoring all EAS channels.'; statusBadge.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-ern-green/10 border border-ern-green/30'; statusBadge.querySelector('span:first-child').className = 'w-2.5 h-2.5 rounded-full bg-ern-green pulse-green'; statusText.className = 'text-xs font-bold text-ern-green uppercase tracking-wider'; statusText.textContent = 'All Systems Operational'; infoStatus.className = 'text-sm font-semibold text-ern-green'; infoStatus.textContent = 'Operational'; bannerTime.textContent = ''; }
+    function setAlertState(eventCode, eventText) { alertActive = true; bannerEl.className = 'bg-ern-red/10 border-b border-ern-red/40 transition-all duration-500'; bannerIcon.className = 'flex-shrink-0 w-8 h-8 rounded-lg bg-ern-red/20 flex items-center justify-center pulse-red'; bannerIcon.innerHTML = '<svg class="w-5 h-5 text-ern-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>'; bannerText.className = 'text-sm font-medium text-ern-red'; bannerText.innerHTML = '<span class="font-bold uppercase tracking-wider blink">Active Broadcast Alert</span> &mdash; ' + eventCode + ': ' + eventText; statusBadge.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-ern-red/10 border border-ern-red/40'; statusBadge.querySelector('span:first-child').className = 'w-2.5 h-2.5 rounded-full bg-ern-red blink'; statusText.className = 'text-xs font-bold text-ern-red uppercase tracking-wider'; statusText.textContent = 'Active Broadcast Alert'; infoStatus.className = 'text-sm font-semibold text-ern-red'; infoStatus.textContent = 'Alert Active'; bannerTime.textContent = new Date().toLocaleTimeString('en-US', { hour12: false }) + ' LOCAL'; }
+    const logTableBody = document.getElementById('log-table-body'); const logCount = document.getElementById('log-count');
+    const eventCodes = { 'RWT': { name: 'Required Weekly Test', color: 'green' }, 'RMT': { name: 'Required Monthly Test', color: 'amber' }, 'SVR': { name: 'Severe Thunderstorm Warning', color: 'amber' }, 'TOR': { name: 'Tornado Warning', color: 'red' }, 'FFW': { name: 'Flash Flood Warning', color: 'red' }, 'WXR': { name: 'Weather Alert', color: 'amber' }, 'CIV': { name: 'Civil Emergency Message', color: 'red' }, 'EAN': { name: 'Emergency Action Notification', color: 'red' }, 'EVI': { name: 'Evacuation Immediate', color: 'red' }, 'SPW': { name: 'Severe Weather Statement', color: 'amber' } };
+    const originators = ['EAS', 'NWS', 'CIV', 'WXR', 'PEP'];
+    const fipsAreas = ['036061 (New York, NY)', '036081 (Queens, NY)', '036047 (Kings/Brooklyn, NY)', '036005 (Bronx, NY)', '036085 (Richmond/Staten Island, NY)', '036103 (Suffolk, NY)', '036059 (Nassau, NY)', '034013 (Hudson, NJ)', '034039 (Union, NJ)'];
+    function generateLogEntries() { const entries = []; const now = new Date(); const codes = Object.keys(eventCodes); const count = 8 + Math.floor(Math.random() * 5); for (let i = 0; i < count; i++) { const code = codes[Math.floor(Math.random() * codes.length)]; const eventInfo = eventCodes[code]; const originator = originators[Math.floor(Math.random() * originators.length)]; const fips = fipsAreas[Math.floor(Math.random() * fipsAreas.length)]; const offset = Math.random() * 48 * 60 * 60 * 1000; const time = new Date(now.getTime() - offset); const isTest = code === 'RWT' || code === 'RMT'; const status = isTest ? 'Completed' : (Math.random() > 0.3 ? 'Expired' : 'Active'); entries.push({ time, code, eventName: eventInfo.name, color: eventInfo.color, originator, fips, status }); } entries.sort((a, b) => b.time - a.time); return entries; }
+    function colorClasses(color) { switch(color) { case 'green': return { badge: 'bg-ern-green/20 text-ern-green', status: 'text-ern-green' }; case 'amber': return { badge: 'bg-ern-amber/20 text-ern-amber', status: 'text-ern-amber' }; case 'red': return { badge: 'bg-ern-red/20 text-ern-red', status: 'text-ern-red' }; default: return { badge: 'bg-slate-700 text-slate-300', status: 'text-slate-400' }; } }
+    function statusClass(status) { switch(status) { case 'Completed': return 'text-slate-400'; case 'Expired': return 'text-slate-500'; case 'Active': return 'text-ern-red font-semibold'; default: return 'text-slate-400'; } }
+    function renderLog() { const entries = generateLogEntries(); logTableBody.innerHTML = ''; entries.forEach(entry => { const cc = colorClasses(entry.color); const timeStr = entry.time.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); const row = document.createElement('tr'); row.className = 'log-row border-b border-ern-border/30'; row.innerHTML = '<td class="px-4 py-2.5 font-mono text-xs text-slate-400 whitespace-nowrap">' + timeStr + '</td><td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs font-bold font-mono ' + cc.badge + '">' + entry.code + '</span><span class="hidden md:inline text-xs text-slate-400 ml-2">' + entry.eventName + '</span></td><td class="px-4 py-2.5 font-mono text-xs text-slate-300">' + entry.originator + '</td><td class="px-4 py-2.5 font-mono text-xs text-slate-400 hidden sm:table-cell">' + entry.fips + '</td><td class="px-4 py-2.5"><span class="text-xs ' + statusClass(entry.status) + '">' + entry.status + '</span></td>'; logTableBody.appendChild(row); }); logCount.textContent = entries.length + ' transmissions logged'; }
+    renderLog();
+    document.getElementById('refresh-log').addEventListener('click', () => { const icon = document.querySelector('#refresh-log svg'); icon.style.transition = 'transform 0.5s'; icon.style.transform = 'rotate(360deg)'; setTimeout(() => { icon.style.transform = ''; }, 500); renderLog(); });
+  </script>
+</body>
+</html>
