@@ -1,0 +1,3506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ERN — EAS Relay Network (VTWF) | Emergency Broadcast Dashboard</title>
+  <meta name="description" content="EAS Relay Network (ERN / VTWF) — 24/7 emergency alert relay broadcasting from New York City." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'ern-dark': '#0f172a',
+            'ern-surface': '#1e293b',
+            'ern-border': '#334155',
+            'ern-green': '#22c55e',
+            'ern-amber': '#f59e0b',
+            'ern-red': '#ef4444',
+          },
+          fontFamily: { 'mono': ['JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="/assets/twc-icons/twc-icon-engine.js"></script>
+  <link rel="stylesheet" href="/assets/weatherPanels.css" />
+  <script type="module" src="/js/app.js"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes pulse-red { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
+    .pulse-red { animation: pulse-red 1.5s ease-in-out infinite; }
+    @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); } 50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); } }
+    .pulse-green { animation: pulse-green 2s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .blink { animation: blink 1s step-start infinite; }
+    .scanline { background: repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px); }
+    input[type="range"] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: #334155; outline: none; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #22c55e; cursor: pointer; box-shadow: 0 0 8px rgba(34,197,94,0.5); }
+    input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #22c55e; cursor: pointer; border: none; }
+    .log-row:hover { background: rgba(34,197,94,0.05); }
+    .log-row { transition: background 0.15s; }
+    .twc-pixel-icon {
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-crisp-edges;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+    html { background-color: #0b0f19; overflow-x: hidden; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) {
+      animation: 0.8s ease-in-out both storm-exit;
+    }
+    ::view-transition-new(root) {
+      animation: 0.9s ease-in-out both storm-enter;
+    }
+    @keyframes storm-exit {
+      0% { opacity: 1; filter: brightness(1) contrast(1); }
+      30% { opacity: 0.9; filter: brightness(4) contrast(2) drop-shadow(0 0 45px #60a5fa); }
+      55% { opacity: 0.8; filter: brightness(1.6); }
+      75% { opacity: 0.95; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      100% { opacity: 0; filter: brightness(0.2); }
+    }
+    @keyframes storm-enter {
+      0% { opacity: 0; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      30% { opacity: 0.85; filter: brightness(3.5) contrast(1.8); }
+      60% { opacity: 0.95; filter: brightness(2); }
+      85% { opacity: 1; filter: brightness(2.5) drop-shadow(0 0 30px #60a5fa); }
+      100% { opacity: 1; filter: brightness(1) contrast(1) drop-shadow(0 0 0 transparent); }
+    }
+
+    /* VISIBLE 6S RAIN CANVAS & OVERLAY */
+    #storm-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 99999;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      background: radial-gradient(circle at 50% 30%, rgba(96,165,250,0.15) 0%, rgba(11,15,25,0.6) 100%);
+    }
+    #storm-overlay.active { opacity: 1; }
+    #rain-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .lightning-flash {
+      position: absolute;
+      inset: 0;
+      background: rgba(219, 234, 254, 0.45);
+      mix-blend-mode: overlay;
+      opacity: 0;
+    }
+    .lightning-flash.strike-1 { animation: flash-strike 1.2s ease-out; }
+    @keyframes flash-strike {
+      0% { opacity: 0; }
+      8% { opacity: 1; }
+      20% { opacity: 0.2; }
+      30% { opacity: 0.95; }
+      55% { opacity: 0.15; }
+      75% { opacity: 0.8; }
+      100% { opacity: 0; }
+    }
+    /* 3D MECHANICAL SPLIT-FLAP FLIP CLOCK ANIMATION */
+    .flip-card {
+      perspective: 300px;
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
+    }
+    .flip-anim-down {
+      animation: flip-flap-down 0.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) forwards;
+      transform-origin: 50% 50%;
+    }
+    @keyframes flip-flap-down {
+      0% {
+        transform: rotateX(0deg);
+        filter: brightness(1);
+      }
+      49% {
+        transform: rotateX(-90deg) scale(0.96);
+        filter: brightness(0.6);
+      }
+      50% {
+        transform: rotateX(90deg) scale(0.96);
+        filter: brightness(1.4);
+      }
+      100% {
+        transform: rotateX(0deg);
+        filter: brightness(1);
+      }
+    }
+    /* VIBRANT CRIMSON & ROYAL BLUE SIDEWAYS AMBIENT BACKGROUND */
+    body.dynamic-ambient-bg {
+      background: linear-gradient(90deg, 
+        #881337 0%, 
+        #1e3a8a 25%, 
+        #991b1b 50%, 
+        #0369a1 75%, 
+        #881337 100%
+      );
+      background-size: 300% 100%;
+      animation: ambientGradientSideways 12s ease-in-out infinite alternate;
+      background-attachment: fixed;
+    }
+    @keyframes ambientGradientSideways {
+      0% {
+        background-position: 0% 0%;
+      }
+      100% {
+        background-position: 100% 0%;
+      }
+    }
+  </style>
+</head>
+<body class="dynamic-ambient-bg text-slate-200 min-h-screen">
+  <header class="sticky top-0 z-50 bg-ern-surface/95 backdrop-blur border-b border-ern-border scanline">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-ern-red to-red-700 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-red-900/30">ERN</div>
+          <div><h1 class="text-base sm:text-lg font-bold text-white leading-tight">EAS Relay Network</h1><p class="text-xs text-slate-400 font-mono">ERN / VTWF &mdash; New York City</p></div>
+        </div>
+        <nav class="flex items-center gap-1 sm:gap-2">
+          <a href="/" class="px-3 py-1.5 text-sm font-medium text-ern-green rounded-lg bg-ern-green/10">Dashboard</a>
+          
+          <!-- Weather Operations Dropdown Menu -->
+          <div class="relative group">
+            <button class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition inline-flex items-center gap-1">
+              Weather Operations
+              <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="absolute left-0 mt-1 w-52 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1.5 hidden group-hover:block z-50">
+              <a href="/convective.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ⚡ Convective Hub
+              </a>
+              <a href="/reports.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                🌪️ Storm Reports
+              </a>
+              <a href="/observations.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ✈️ Aviation &amp; Marine
+              </a>
+            </div>
+          </div>
+
+          <a href="/announcements.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition relative inline-flex items-center gap-1.5">Announcements <span id="announcement-nav-badge" class="hidden px-1.5 py-0.2 text-[10px] font-extrabold uppercase rounded-full bg-red-600 text-white shadow-sm shadow-red-500/50 animate-pulse">!</span></a>
+          <a href="/status.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Status</a>
+          <a href="/about.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">About</a>
+          <a href="/links.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Links</a>
+          <a href="/settings.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition flex items-center gap-1">
+            <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Settings
+          </a>
+          <a href="/login.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Admin</a>
+        </nav>
+      </div>
+      <div class="flex items-center justify-between py-2 border-t border-ern-border/50 flex-wrap gap-2">
+        <div class="flex items-center gap-3">
+          <div id="status-badge" class="flex items-center gap-2 px-3 py-1 rounded-full bg-ern-green/10 border border-ern-green/30">
+            <span class="w-2.5 h-2.5 rounded-full bg-ern-green pulse-green"></span>
+            <span id="status-text" class="text-xs font-bold text-ern-green uppercase tracking-wider">All Systems Operational</span>
+          </div>
+          <span class="hidden sm:inline text-xs text-slate-500 font-mono">|</span>
+          <span class="hidden sm:inline text-xs text-slate-400 font-mono">Broadcasting 24/7</span>
+        </div>
+        <!-- Live Precision Clocks: Analog Clock & Mechanical Flip Clock -->
+        <div class="flex items-center gap-3 sm:gap-4 py-1">
+          <!-- Real-Time Analog Broadcast Chronometer -->
+          <div class="flex items-center gap-2">
+            <svg id="analog-clock-svg" width="34" height="34" viewBox="0 0 100 100" class="drop-shadow-md">
+              <circle cx="50" cy="50" r="46" fill="#0f172a" stroke="#334155" stroke-width="4"/>
+              <!-- Hour tick marks -->
+              <line x1="50" y1="10" x2="50" y2="16" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+              <line x1="90" y1="50" x2="84" y2="50" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+              <line x1="50" y1="90" x2="50" y2="84" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+              <line x1="10" y1="50" x2="16" y2="50" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+              <!-- Hands -->
+              <line id="analog-hour" x1="50" y1="50" x2="50" y2="26" stroke="#f1f5f9" stroke-width="4" stroke-linecap="round"/>
+              <line id="analog-min" x1="50" y1="50" x2="50" y2="17" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+              <line id="analog-sec" x1="50" y1="56" x2="50" y2="14" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="50" cy="50" r="3.5" fill="#ef4444"/>
+            </svg>
+            <div class="hidden lg:block text-[10px] font-mono leading-tight text-slate-400">
+              <span class="text-slate-500 font-bold">ANALOG</span><br/>CHRONO
+            </div>
+          </div>
+
+          <!-- Studio Flip Clock (NYC Time - EDT) -->
+          <div class="flex items-center gap-1">
+            <span class="text-[10px] font-mono text-slate-500 mr-1 hidden sm:inline">EDT</span>
+            <!-- Hours Flip -->
+            <div class="flex items-center gap-0.5">
+              <div id="flip-h1" class="w-4 sm:w-5 h-6 sm:h-7 bg-slate-900 border border-slate-700/80 rounded flex items-center justify-center font-mono font-bold text-white text-xs sm:text-sm shadow-inner relative overflow-hidden">
+                <div class="absolute inset-x-0 top-1/2 h-[1px] bg-slate-800/80"></div>
+                <span>0</span>
+              </div>
+              <div id="flip-h2" class="w-4 sm:w-5 h-6 sm:h-7 bg-slate-900 border border-slate-700/80 rounded flex items-center justify-center font-mono font-bold text-white text-xs sm:text-sm shadow-inner relative overflow-hidden">
+                <div class="absolute inset-x-0 top-1/2 h-[1px] bg-slate-800/80"></div>
+                <span>0</span>
+              </div>
+            </div>
+            <span class="text-slate-500 font-bold font-mono text-xs">:</span>
+            <!-- Minutes Flip -->
+            <div class="flex items-center gap-0.5">
+              <div id="flip-m1" class="w-4 sm:w-5 h-6 sm:h-7 bg-slate-900 border border-slate-700/80 rounded flex items-center justify-center font-mono font-bold text-white text-xs sm:text-sm shadow-inner relative overflow-hidden">
+                <div class="absolute inset-x-0 top-1/2 h-[1px] bg-slate-800/80"></div>
+                <span>0</span>
+              </div>
+              <div id="flip-m2" class="w-4 sm:w-5 h-6 sm:h-7 bg-slate-900 border border-slate-700/80 rounded flex items-center justify-center font-mono font-bold text-white text-xs sm:text-sm shadow-inner relative overflow-hidden">
+                <div class="absolute inset-x-0 top-1/2 h-[1px] bg-slate-800/80"></div>
+                <span>0</span>
+              </div>
+            </div>
+            <span class="text-slate-500 font-bold font-mono text-xs">:</span>
+            <!-- Seconds Flip -->
+            <div class="flex items-center gap-0.5">
+              <div id="flip-s1" class="w-4 sm:w-5 h-6 sm:h-7 bg-slate-900 border border-red-500/40 rounded flex items-center justify-center font-mono font-bold text-red-400 text-xs sm:text-sm shadow-inner relative overflow-hidden">
+                <div class="absolute inset-x-0 top-1/2 h-[1px] bg-slate-800/80"></div>
+                <span>0</span>
+              </div>
+              <div id="flip-s2" class="w-4 sm:w-5 h-6 sm:h-7 bg-slate-900 border border-red-500/40 rounded flex items-center justify-center font-mono font-bold text-red-400 text-xs sm:text-sm shadow-inner relative overflow-hidden">
+                <div class="absolute inset-x-0 top-1/2 h-[1px] bg-slate-800/80"></div>
+                <span>0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- UTC Station Clock -->
+          <div class="hidden md:flex flex-col text-right font-mono text-[10px] leading-tight pl-2 border-l border-slate-700/60">
+            <span class="text-slate-500 font-bold">UTC RELAY</span>
+            <span id="utc-clock" class="text-slate-300 font-semibold mt-0.5">--:--:--</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div id="emergency-banner" class="bg-ern-green/10 border-b border-ern-green/30 transition-all duration-500">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
+      <div class="flex items-center gap-3">
+        <div id="banner-icon" class="flex-shrink-0 w-8 h-8 rounded-lg bg-ern-green/20 flex items-center justify-center">
+          <svg class="w-5 h-5 text-ern-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="flex-1 overflow-hidden">
+          <p id="banner-text" class="text-sm font-medium text-ern-green"><span class="font-bold uppercase tracking-wider">Normal Broadcast</span> &mdash; No active alerts. Monitoring all EAS channels.</p>
+        </div>
+        <span id="banner-time" class="hidden sm:block text-xs font-mono text-slate-500 flex-shrink-0"></span>
+        <button id="clear-alerts-btn" class="ml-4 px-2 py-1 bg-slate-800/80 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded text-xs font-mono border border-slate-700 hover:border-red-500/50 transition">Dismiss</button>
+      </div>
+    </div>
+  </div>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <section class="bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl">
+      <div class="px-5 py-3 border-b border-ern-border flex items-center justify-between">
+        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-ern-red blink"></span><h2 class="text-sm font-bold text-white uppercase tracking-wider">Live Stream</h2></div>
+        <span id="stream-relay-badge" class="text-xs font-mono text-slate-500">ERN-VTWF Relay</span>
+      </div>
+      <div class="p-5">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div>
+            <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Now Playing</p>
+            <p id="now-playing" class="text-lg font-semibold text-white">ERN-VTWF &mdash; Live Relay</p>
+            <p id="now-playing-sub" class="text-sm text-slate-400">Monitoring emergency alert channels</p>
+          </div>
+          <div id="stream-status" class="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-700/50">
+            <span class="w-2 h-2 rounded-full bg-slate-500" id="stream-dot"></span>
+            <span id="stream-status-text" class="text-xs font-medium text-slate-400">Connecting...</span>
+          </div>
+        </div>
+        <div class="bg-ern-dark rounded-xl p-4 border border-ern-border/50">
+          <audio id="audio-player" preload="none" crossorigin="anonymous">
+            <source src="/api/stream/live" type="audio/mpeg" />
+            <source src="/api/stream/wjonip" type="audio/mpeg" />
+          </audio>
+          <div class="flex items-center gap-3 sm:gap-4">
+            <button id="play-btn" class="flex-shrink-0 w-12 h-12 rounded-full bg-ern-green hover:bg-green-500 flex items-center justify-center transition shadow-lg shadow-green-900/30">
+              <svg id="play-icon" class="w-6 h-6 text-ern-dark" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="pause-icon" class="w-6 h-6 text-ern-dark hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+            <button id="mute-btn" class="flex-shrink-0 w-10 h-10 rounded-lg bg-slate-700/50 hover:bg-slate-700 flex items-center justify-center transition">
+              <svg id="vol-icon" class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M17.95 6.05a8 8 0 010 11.9M5 9v6h4l5 4V5L9 9H5z"/></svg>
+              <svg id="mute-icon" class="w-5 h-5 text-slate-300 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 9v6h4l5 4V5L9 9H5zm11-1l4 4m0-4l-4 4"/></svg>
+            </button>
+            <div class="flex items-center gap-2 flex-1 min-w-[100px]">
+              <input type="range" id="volume-slider" min="0" max="100" value="75" class="flex-1" />
+              <span id="volume-text" class="text-xs font-mono text-slate-400 w-8 text-right">75%</span>
+            </div>
+            <a id="direct-stream-link" href="https://icecast.gwes-eas.network/ERN-VTWF" target="_blank" rel="noopener" class="flex-shrink-0 hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-xs text-slate-300 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg><span id="direct-stream-label">Direct</span>
+            </a>
+          </div>
+          <!-- Real-Time Web Audio API RF Spectrum & Peak VU Meter -->
+          <div class="mt-3 pt-3 border-t border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div class="flex items-center gap-2">
+              <span id="spectrum-live-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span id="spectrum-status-text" class="text-[11px] font-mono text-slate-400 uppercase tracking-wider">RF Spectrum Analyser &bull; Standby</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <!-- Real-time 32-band FFT Canvas -->
+              <canvas id="audio-spectrum-canvas" width="180" height="24" class="rounded bg-slate-950/80 border border-slate-800"></canvas>
+              <!-- Real-time Peak VU dB Meter -->
+              <div class="flex flex-col gap-0.5 w-12 text-right">
+                <span class="text-[9px] font-mono text-slate-500" id="audio-db-text">-∞ dB</span>
+                <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                  <div id="audio-vu-bar" class="bg-ern-green h-full w-0 transition-all duration-75"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Dynamic Song & Track Metadata Card (BUTT / Icecast Feed) -->
+        <div id="now-playing-card" class="mt-4 p-4 rounded-xl border border-ern-border/60 bg-slate-900/90 flex items-center gap-4 shadow-inner">
+          <div class="relative flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center shadow-md">
+            <img id="album-cover" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231e293b'/><circle cx='50' cy='50' r='35' fill='%230f172a' stroke='%23334155' stroke-width='4'/><circle cx='50' cy='50' r='12' fill='%23ef4444'/><circle cx='50' cy='50' r='4' fill='white'/></svg>" alt="Album Cover" class="w-full h-full object-cover transition-opacity duration-300" />
+            <div id="cover-vinyl-glow" class="hidden absolute inset-0 rounded-lg border-2 border-ern-green/40 pointer-events-none animate-pulse"></div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span id="track-badge" class="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-ern-green/20 text-ern-green">LIVE BROADCAST</span>
+              <span id="track-listeners" class="text-xs font-mono text-slate-500"></span>
+            </div>
+            <h3 id="track-title" class="text-base sm:text-lg font-bold text-white truncate">ERN-VTWF &mdash; Live Relay</h3>
+            <p id="track-artist" class="text-xs sm:text-sm text-slate-300 truncate mt-0.5">EAS Relay Network &bull; New York City</p>
+            <p id="track-album" class="text-xs text-slate-500 truncate mt-0.5"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live Doppler Radar Section (Mapbox + OpenWeatherMap Radar Overlay) -->
+    <section class="bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl">
+      <div class="px-5 py-3 border-b border-ern-border flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 flex-wrap">
+            Live Weather Radar &amp; Precip Overlay
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">NEXRAD / OWM</span>
+            <span id="radar-refresh-badge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+              <svg class="w-2.5 h-2.5 animate-spin text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Auto-refresh: <span id="radar-timer">02:00</span>
+            </span>
+          </h2>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex items-center bg-slate-900 rounded-lg p-0.5 border border-slate-700 text-xs flex-wrap gap-0.5">
+            <button id="radar-layer-nexrad" class="px-2.5 py-1 rounded-md font-bold text-white bg-red-600 transition flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+              NOAA NEXRAD N0Q
+            </button>
+            <button id="radar-layer-precip" class="px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition">Precip (OWM)</button>
+            <button id="radar-layer-clouds" class="px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition">Clouds</button>
+            <button id="radar-layer-wind" class="px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition">Wind</button>
+          </div>
+          <button id="toggle-nexrad-sites" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-amber-300 font-mono flex items-center gap-1 transition">
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            NCDC Radar Sites
+          </button>
+          <button id="recenter-radar" class="p-1.5 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-300 transition" title="Recenter to NYC Hub">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="relative w-full h-[500px] sm:h-[650px] lg:h-[750px] bg-slate-950">
+        <div id="radar-map" class="w-full h-full"></div>
+        <!-- Legend Overlay -->
+        <div class="absolute bottom-3 left-3 z-10 bg-slate-900/90 backdrop-blur border border-slate-700/80 rounded-xl p-2.5 text-xs shadow-xl pointer-events-none">
+          <div class="flex items-center gap-1.5 mb-1.5">
+            <span class="font-bold text-slate-200">Precipitation Intensity (dBZ)</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <div class="w-5 h-2.5 rounded-sm bg-[#00ff00]"></div>
+            <div class="w-5 h-2.5 rounded-sm bg-[#ffff00]"></div>
+            <div class="w-5 h-2.5 rounded-sm bg-[#ff9900]"></div>
+            <div class="w-5 h-2.5 rounded-sm bg-[#ff0000]"></div>
+            <div class="w-5 h-2.5 rounded-sm bg-[#cc00ff]"></div>
+          </div>
+          <div class="flex justify-between text-[9px] text-slate-400 font-mono mt-1">
+            <span>Light</span>
+            <span>Mod</span>
+            <span>Heavy</span>
+            <span>Severe</span>
+          </div>
+        </div>
+        <!-- Coverage Hub Tag -->
+        <div class="absolute top-3 left-3 z-10 bg-slate-900/90 backdrop-blur border border-slate-700/80 rounded-lg px-2.5 py-1 text-[11px] text-slate-300 font-mono flex items-center gap-2 shadow-lg">
+          <span class="w-2 h-2 rounded-full bg-ern-green"></span>
+          ERN Hub: New York City, NY (40.7128° N, 74.0060° W)
+        </div>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section class="space-y-6">
+        <div class="bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl h-full flex flex-col">
+          <div class="px-4 py-2.5 border-b border-ern-border flex flex-wrap items-center justify-between gap-3 bg-slate-900/60">
+            <div class="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800" id="iembot-tab-bar">
+              <button id="tab-btn-okx" onclick="setOffice('OKX')" class="iem-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition border border-[#38bdf8] bg-[#1e293b] text-[#38bdf8] shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-[#38bdf8] animate-pulse"></span>
+                NWS New York (OKX)
+              </button>
+              <button id="tab-btn-phi" onclick="setOffice('PHI')" class="iem-tab-btn flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold font-mono text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition border border-transparent">
+                <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                NWS Mount Holly (PHI)
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="active-tab-indicator" class="text-[10px] font-mono text-[#38bdf8] font-bold uppercase border border-[#38bdf8]/30 bg-[#38bdf8]/10 px-2 py-0.5 rounded">OKX LIVE</span>
+            </div>
+          </div>
+          <!-- Alert Category Filter Pills Bar -->
+          <div class="px-4 py-2 border-b border-slate-800/80 bg-slate-950/90 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            <button id="filter-btn-all" onclick="setIemFilter('all')" class="iem-filter-pill px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition border border-sky-500/40 bg-sky-500/20 text-sky-300 shadow-sm whitespace-nowrap">
+              🌐 Full Chat &amp; Alerts
+            </button>
+            <button id="filter-btn-alerts" onclick="setIemFilter('alerts')" class="iem-filter-pill px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium text-slate-400 hover:text-amber-300 hover:bg-amber-950/30 transition border border-transparent whitespace-nowrap">
+              ⚡ Alerts Only
+            </button>
+            <button id="filter-btn-warnings" onclick="setIemFilter('warnings')" class="iem-filter-pill px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium text-slate-400 hover:text-red-300 hover:bg-red-950/30 transition border border-transparent whitespace-nowrap">
+              🔴 Warnings Only
+            </button>
+            <button id="filter-btn-chat" onclick="setIemFilter('chat')" class="iem-filter-pill px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition border border-transparent whitespace-nowrap">
+              💬 Chat / Spotters
+            </button>
+          </div>
+          <div class="flex-1 p-4 bg-slate-950/50">
+            <div id="iembot-feed" class="h-[360px] overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-slate-700">
+              <div class="text-center text-slate-500 text-xs font-mono italic mt-8">Connecting to NWSChat servers...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="space-y-6">
+        <div class="bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl h-full flex flex-col">
+          <div class="px-4 py-2.5 border-b border-ern-border flex flex-wrap items-center justify-between gap-3 bg-slate-900/60">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">24/7 Operational Imagery Deck</h2>
+            </div>
+            <span class="text-[10px] font-mono text-emerald-400 font-bold uppercase border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 rounded">Live Deck</span>
+          </div>
+          <!-- Operational Imagery Filter Pills Bar -->
+          <div class="px-4 py-2 border-b border-slate-800/80 bg-slate-950/90 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            <button id="img-filter-all" onclick="setImageFilter('all')" class="iem-filter-pill px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold transition border border-emerald-500/40 bg-emerald-500/20 text-emerald-300 shadow-sm whitespace-nowrap">
+              All Products
+            </button>
+            <button id="img-filter-radar" onclick="setImageFilter('radar')" class="iem-filter-pill px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium text-slate-400 hover:text-sky-300 hover:bg-sky-950/30 transition border border-transparent whitespace-nowrap">
+              📡 Radar &amp; Satellite
+            </button>
+            <button id="img-filter-briefings" onclick="setImageFilter('briefings')" class="iem-filter-pill px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium text-slate-400 hover:text-amber-300 hover:bg-amber-950/30 transition border border-transparent whitespace-nowrap">
+              📋 Briefings &amp; SPC
+            </button>
+            <button id="img-filter-skewt" onclick="setImageFilter('skewt')" class="iem-filter-pill px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium text-slate-400 hover:text-cyan-300 hover:bg-cyan-950/30 transition border border-transparent whitespace-nowrap">
+              🎈 Skew-T Sounding
+            </button>
+          </div>
+          <div class="flex-1 p-4 bg-slate-950/50">
+            <div id="iembot-images-feed" class="h-[360px] overflow-y-auto pr-2 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
+              <div class="text-center text-slate-500 text-xs font-mono italic mt-8">Loading 24/7 operational weather deck...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <section class="bg-ern-surface rounded-2xl border border-ern-border overflow-hidden shadow-xl">
+      <div class="px-5 py-3 border-b border-ern-border flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-ern-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider">Station Script Library</h2>
+        </div>
+        <span class="text-xs font-mono text-slate-500">Broadcast Reference Scripts</span>
+      </div>
+      <div class="p-5 space-y-3">
+        <div class="bg-ern-dark rounded-xl border border-ern-border/50 overflow-hidden">
+          <button class="script-tab w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-800/50 transition" data-target="pre-alert-script">
+            <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-ern-amber/20 text-ern-amber font-mono">PRE</span><span class="text-sm font-semibold text-white">30-Second Branded Pre-Alert Script</span></div>
+            <svg class="w-5 h-5 text-slate-400 chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="pre-alert-script" class="hidden px-4 pb-4">
+            <div class="bg-slate-950/50 rounded-lg p-4 border border-ern-border/30">
+              <p class="text-sm text-slate-300 leading-relaxed italic">"This is an official priority transmission from the EAS Relay Network and VTWF relay operations. Stand by for emergency alert information. Do not adjust your receiver. This is a test of the Emergency Alert System relay network. This is only a test."</p>
+              <div class="flex items-center gap-2 mt-3">
+                <button class="copy-script text-xs text-ern-green hover:text-green-400 font-medium flex items-center gap-1 transition" data-target="pre-alert-script">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Copy
+                </button>
+                <span class="text-xs text-slate-600">~30 sec read time</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-ern-dark rounded-xl border border-ern-border/50 overflow-hidden">
+          <button class="script-tab w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-800/50 transition" data-target="post-alert-script">
+            <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-ern-green/20 text-ern-green font-mono">POST</span><span class="text-sm font-semibold text-white">30-Second Branded Post-Alert Script</span></div>
+            <svg class="w-5 h-5 text-slate-400 chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="post-alert-script" class="hidden px-4 pb-4">
+            <div class="bg-slate-950/50 rounded-lg p-4 border border-ern-border/30">
+              <p class="text-sm text-slate-300 leading-relaxed italic">"This concludes the priority emergency transmission from the EAS Relay Network and VTWF relay operations. Normal programming will resume. You may now resume regular monitoring. This has been a broadcast of the EAS Relay Network. Thank you for listening."</p>
+              <div class="flex items-center gap-2 mt-3">
+                <button class="copy-script text-xs text-ern-green hover:text-green-400 font-medium flex items-center gap-1 transition" data-target="post-alert-script">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Copy
+                </button>
+                <span class="text-xs text-slate-600">~30 sec read time</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-ern-dark rounded-xl border border-ern-border/50 overflow-hidden">
+          <button class="script-tab w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-800/50 transition" data-target="tts-prompt-script">
+            <div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded text-xs font-bold bg-blue-500/20 text-blue-400 font-mono">TTS</span><span class="text-sm font-semibold text-white">Script TTS Prompt Template</span></div>
+            <svg class="w-5 h-5 text-slate-400 chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="tts-prompt-script" class="hidden px-4 pb-4">
+            <div class="bg-slate-950/50 rounded-lg p-4 border border-ern-border/30">
+              <p class="text-sm text-slate-300 leading-relaxed italic font-mono">"This is an official transmission from the EAS Relay Network and VTWF. The following is a %EVENT_NAME% issued for the following counties: %COUNTY_LIST%. %MESSAGE_TEXT% This concludes this transmission from the ERN and VTWF network."</p>
+              <div class="flex items-center gap-2 mt-3">
+                <button class="copy-script text-xs text-ern-green hover:text-green-400 font-medium flex items-center gap-1 transition" data-target="tts-prompt-script">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Copy
+                </button>
+                <span class="text-xs text-slate-600">Variables: %EVENT_NAME%, %COUNTY_LIST%, %MESSAGE_TEXT%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- Live NYC Meteorological & Transmitter Telemetry Strip -->
+    <section class="bg-ern-surface rounded-2xl border border-ern-border p-5 shadow-xl">
+      <div class="flex items-center justify-between mb-3 border-b border-ern-border/60 pb-2.5">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider">Local NYC Meteorological Telemetry &amp; 7-Day Forecast</h2>
+        </div>
+        <span id="wx-updated-time" class="text-xs font-mono text-slate-500">Live KNYC Feed</span>
+      </div>
+      <!-- Current Conditions Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        <div class="bg-ern-dark/70 rounded-xl p-3 border border-ern-border/40 flex items-center justify-between">
+          <div>
+            <p class="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Ambient Temp</p>
+            <p id="wx-temp" class="text-base sm:text-lg font-bold text-white mt-0.5">--°F</p>
+            <p id="wx-feels" class="text-[11px] text-slate-400">Feels like --°F</p>
+          </div>
+          <img id="wx-twc-icon" src="/assets/twc-icons/sunny.png" alt="Current Weather" class="w-8 h-8 twc-pixel-icon object-contain opacity-90" onerror="this.src='/assets/twc-icons/unknown.png'" />
+        </div>
+        <div class="bg-ern-dark/70 rounded-xl p-3 border border-ern-border/40">
+          <p class="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Conditions</p>
+          <div class="flex items-center gap-1.5 mt-0.5">
+            <p id="wx-condition" class="text-base sm:text-lg font-bold text-cyan-300 truncate">Monitoring</p>
+          </div>
+          <p id="wx-humidity" class="text-[11px] text-slate-400">Humidity --%</p>
+        </div>
+        <div class="bg-ern-dark/70 rounded-xl p-3 border border-ern-border/40">
+          <p class="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Wind Velocity</p>
+          <p id="wx-wind" class="text-base sm:text-lg font-bold text-white mt-0.5">-- mph</p>
+          <p id="wx-wind-dir" class="text-[11px] text-slate-400">Station Anemometer</p>
+        </div>
+        <div class="bg-ern-dark/70 rounded-xl p-3 border border-ern-border/40">
+          <p class="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Barometer</p>
+          <p id="wx-pressure" class="text-base sm:text-lg font-bold text-emerald-400 mt-0.5">-- inHg</p>
+          <p id="wx-pressure-trend" class="text-[11px] text-slate-400">Standard Sea Level</p>
+        </div>
+      </div>
+
+      <!-- Local (Red) & Regional (Blue) Coverage Area Badge & Legend -->
+      <div class="mb-4 p-3 rounded-xl bg-slate-900/90 border border-slate-700/70 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/30">
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+            <span class="text-xs font-bold text-red-300">Local Area (Primary Monitoring)</span>
+          </div>
+          <span class="text-xs text-slate-400">NYC 5 Boroughs, Long Island (Nassau/Suffolk), Westchester, Bergen, Hudson, Essex, Union, Passaic</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-blue-500/15 border border-blue-500/30">
+            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+            <span class="text-xs font-bold text-blue-300">Regional EAS Relay Backup</span>
+          </div>
+          <span class="text-xs text-slate-500 font-mono">NWS OKX / Upton, NY</span>
+        </div>
+      </div>
+
+      <!-- 7-Day Weather Outlook Grid -->
+      <div class="pt-3 border-t border-ern-border/60">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            7-Day Regional Emergency Weather Outlook (NWS OKX)
+          </span>
+          <span class="text-[10px] font-mono text-slate-500">NOAA / NWS OKX Synoptic</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-3" id="forecast-7day-container">
+          <!-- Forecast Days 1-7 (Populated dynamically) -->
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/50 text-center animate-pulse">
+            <div class="text-[11px] font-bold text-slate-400 font-mono">Today</div>
+            <div class="text-lg my-1">⛅</div>
+            <div class="text-xs font-bold text-white">--° / --°</div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/50 text-center animate-pulse">
+            <div class="text-[11px] font-bold text-slate-400 font-mono">Day 2</div>
+            <div class="text-lg my-1">⛅</div>
+            <div class="text-xs font-bold text-white">--° / --°</div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/50 text-center animate-pulse">
+            <div class="text-[11px] font-bold text-slate-400 font-mono">Day 3</div>
+            <div class="text-lg my-1">⛅</div>
+            <div class="text-xs font-bold text-white">--° / --°</div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/50 text-center animate-pulse">
+            <div class="text-[11px] font-bold text-slate-400 font-mono">Day 4</div>
+            <div class="text-lg my-1">⛅</div>
+            <div class="text-xs font-bold text-white">--° / --°</div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/50 text-center animate-pulse">
+            <div class="text-[11px] font-bold text-slate-400 font-mono">Day 5</div>
+            <div class="text-lg my-1">⛅</div>
+            <div class="text-xs font-bold text-white">--° / --°</div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/50 text-center animate-pulse">
+            <div class="text-[11px] font-bold text-slate-400 font-mono">Day 6</div>
+            <div class="text-lg my-1">⛅</div>
+            <div class="text-xs font-bold text-white">--° / --°</div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-700/50 text-center animate-pulse">
+            <div class="text-[11px] font-bold text-slate-400 font-mono">Day 7</div>
+            <div class="text-lg my-1">⛅</div>
+            <div class="text-xs font-bold text-white">--° / --°</div>
+          </div>
+        </div>
+
+        <!-- Official Detailed NWS Synoptic Bulletin Box -->
+        <div id="nws-detailed-bulletin-card" class="bg-slate-950/80 rounded-xl p-3.5 border border-slate-800 text-xs">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/80">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span class="font-bold text-slate-200 font-mono uppercase tracking-wider text-[11px]" id="nws-bulletin-title">Official NWS OKX Synoptic Discussion</span>
+            </div>
+            <span class="text-[10px] font-mono text-cyan-400" id="nws-bulletin-wind">NWS Upton, NY</span>
+          </div>
+          <p id="nws-bulletin-text" class="text-slate-300 leading-relaxed font-sans text-xs">
+            Loading official National Weather Service narrative forecast discussion and synoptic meteorological parameters...
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-4"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Location</p><p class="text-sm font-semibold text-white">New York City, NY</p></div>
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-4"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Station ID</p><p class="text-sm font-semibold text-white font-mono">ERN-VTWF</p></div>
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-4"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Network</p><p class="text-sm font-semibold text-white">GWES EAS Network</p></div>
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-4"><p class="text-xs text-slate-500 uppercase tracking-wider mb-1">Status</p><p id="info-status" class="text-sm font-semibold text-ern-green">Operational</p></div>
+    </section>
+  </main>
+  <footer class="bg-ern-surface border-t border-ern-border mt-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
+      <p class="text-sm text-slate-400">EAS Relay Network (ERN) &mdash; Broadcasting from New York City, New York</p>
+      <p class="text-sm font-semibold text-slate-300 mt-1">&copy; 2026 ERN / EAS Relay Network. All rights reserved.</p>
+    </div>
+  </footer>
+  <script>
+    let isOffline = (localStorage.getItem('ern_station_status') === 'OFFLINE');
+    let isSevereWeather = (localStorage.getItem('ern_severe_weather') === 'true');
+    let lastStatusCheck = '';
+    
+    async function syncAnnouncementsAndStatus() {
+      try {
+        // 1. Fetch server status switch (canonical source of truth)
+        let serverStatus = null;
+        try {
+          const statusRes = await fetch('/api/status', { cache: 'no-store' });
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            serverStatus = statusData.status;
+            isSevereWeather = Boolean(statusData.severeWeather);
+            localStorage.setItem('ern_station_status', serverStatus);
+            localStorage.setItem('ern_severe_weather', isSevereWeather ? 'true' : 'false');
+          }
+        } catch(e) {}
+
+        if (!serverStatus) {
+          serverStatus = localStorage.getItem('ern_station_status');
+          isSevereWeather = (localStorage.getItem('ern_severe_weather') === 'true');
+        }
+
+        if (serverStatus === 'OFFLINE') {
+          isOffline = true;
+        } else if (serverStatus === 'OPERATIONAL') {
+          isOffline = false;
+        }
+
+        // 2. Check live stream health & auto-switch when ERN-VTWF comes online
+        try {
+          const npRes = await fetch('/api/nowplaying', { cache: 'no-store' });
+          if (npRes.ok) {
+            const npData = await npRes.json();
+            if (npData && npData.live) {
+              if (npData.isPrimaryActive) {
+                // Primary is back online! Automatically restore primary ERN-VTWF stream
+                if (isOffline) {
+                  console.log("Primary ERN-VTWF is back online! Automatically restoring primary broadcast stream...");
+                  isOffline = false;
+                  localStorage.setItem('ern_station_status', 'OPERATIONAL');
+                  restorePrimaryStream();
+                }
+              } else {
+                // Primary is confirmed offline; fallback to backup stream
+                if (!isOffline && currentStreamSource !== BACKUP_STREAM_URL) {
+                  console.log("Primary ERN-VTWF is off-air. Hot-swapping to WJON-IP backup stream...");
+                  isOffline = true;
+                  switchToBackupStream();
+                }
+              }
+            }
+          }
+        } catch(e) {}
+
+        // 3. Fetch announcements
+        try {
+          const res = await fetch('/api/announcements', { cache: 'no-store' });
+          if (res.ok) {
+            const announcements = await res.json();
+            localStorage.setItem('ern_announcements', JSON.stringify(announcements));
+          }
+        } catch(e) {}
+      } catch(e) {}
+      
+      applyStatusUI();
+    }
+
+    const audio = document.getElementById('audio-player');
+    const playBtn = document.getElementById('play-btn');
+    const playIcon = document.getElementById('play-icon');
+    const pauseIcon = document.getElementById('pause-icon');
+    const muteBtn = document.getElementById('mute-btn');
+    const volIcon = document.getElementById('vol-icon');
+    const muteIcon = document.getElementById('mute-icon');
+    const volumeSlider = document.getElementById('volume-slider');
+    const volumeText = document.getElementById('volume-text');
+    const streamDot = document.getElementById('stream-dot');
+    const streamStatusText = document.getElementById('stream-status-text');
+    const nowPlaying = document.getElementById('now-playing');
+    const nowPlayingSub = document.getElementById('now-playing-sub');
+    const statusBadge = document.getElementById('status-badge');
+    const statusText = document.getElementById('status-text');
+    const infoStatus = document.getElementById('info-status');
+    const bannerEl = document.getElementById('emergency-banner');
+    const bannerIcon = document.getElementById('banner-icon');
+    const bannerText = document.getElementById('banner-text');
+    const bannerTime = document.getElementById('banner-time');
+    let alertActive = false;
+
+    function applyStatusUI() {
+      if (alertActive) return; 
+      
+      const badge = document.getElementById('status-badge');
+      const text = document.getElementById('status-text');
+      const info = document.getElementById('info-status');
+      const dot = badge ? badge.querySelector('span:first-child') : null;
+      
+      const banner = document.getElementById('emergency-banner');
+      const bIcon = document.getElementById('banner-icon');
+      const bText = document.getElementById('banner-text');
+      
+      if (isOffline) {
+        if (badge) badge.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-slate-700/50 border border-slate-600/50';
+        if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-500';
+        if (text) {
+          text.className = 'text-xs font-bold text-slate-400 uppercase tracking-wider';
+          text.textContent = 'Backup Relay Active';
+        }
+        if (info) {
+          info.className = 'text-sm font-semibold text-amber-400';
+          info.textContent = 'WJON-IP Backup Relay';
+        }
+        
+        if (banner) banner.className = 'bg-slate-800/90 border-b border-slate-700 transition-all duration-500';
+        if (bIcon) {
+          bIcon.className = 'flex-shrink-0 w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center';
+          bIcon.innerHTML = '<svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>';
+        }
+        if (bText) {
+          bText.className = 'text-sm font-medium text-slate-300';
+          bText.innerHTML = '<span class="font-bold uppercase tracking-wider text-amber-400">Primary Off-Air &bull; Backup Active</span> &mdash; ERN/VTWF is currently off-air. Failover stream active via <span class="text-white font-mono font-bold">WJON-IP Backup Relay</span>.';
+        }
+
+        // Switch audio player to WJON-IP backup stream
+        switchToBackupStream();
+
+        if (audio && audio.paused && nowPlaying) {
+          nowPlaying.textContent = 'WJON-IP — Backup Relay Active';
+          nowPlayingSub.textContent = 'Monitoring secondary emergency relay feed';
+          if (streamDot) streamDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+          if (streamStatusText) {
+            streamStatusText.textContent = 'Backup Live';
+            streamStatusText.className = 'text-xs font-medium text-amber-400';
+          }
+        }
+      } else if (isSevereWeather) {
+        // Local Severe Weather Coverage Mode
+        if (badge) badge.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/40 shadow-sm shadow-orange-500/20 animate-pulse';
+        if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-orange-500';
+        if (text) {
+          text.className = 'text-xs font-extrabold text-orange-400 uppercase tracking-wider';
+          text.textContent = 'Severe Weather Coverage';
+        }
+        if (info) {
+          info.className = 'text-sm font-bold text-orange-400';
+          info.textContent = 'Severe Weather Active';
+        }
+        
+        if (banner) banner.className = 'bg-orange-500/15 border-b border-orange-500/40 transition-all duration-500';
+        if (bIcon) {
+          bIcon.className = 'flex-shrink-0 w-8 h-8 rounded-lg bg-orange-500/30 flex items-center justify-center animate-bounce';
+          bIcon.innerHTML = '<svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>';
+        }
+        if (bText) {
+          bText.className = 'text-sm font-medium text-orange-200';
+          bText.innerHTML = '<span class="font-black uppercase tracking-wider text-orange-400">Local Severe Weather Coverage Active</span> &mdash; Priority weather relay in effect for NYC & surrounding areas. Monitoring all NWS channels.';
+        }
+
+        if (audio && audio.paused && nowPlaying) {
+          nowPlaying.textContent = 'ERN-VTWF — Severe Weather Relay';
+          nowPlayingSub.textContent = 'Continuous live emergency weather monitoring';
+        }
+      } else {
+        if (badge) badge.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-ern-green/10 border border-ern-green/30';
+        if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-ern-green pulse-green';
+        if (text) {
+          text.className = 'text-xs font-bold text-ern-green uppercase tracking-wider';
+          text.textContent = 'All Systems Operational';
+        }
+        if (info) {
+          info.className = 'text-sm font-semibold text-ern-green';
+          info.textContent = 'Operational';
+        }
+        
+        if (banner) banner.className = 'bg-ern-green/10 border-b border-ern-green/30 transition-all duration-500';
+        if (bIcon) {
+          bIcon.className = 'flex-shrink-0 w-8 h-8 rounded-lg bg-ern-green/20 flex items-center justify-center';
+          bIcon.innerHTML = '<svg class="w-5 h-5 text-ern-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+        }
+        if (bText) {
+          bText.className = 'text-sm font-medium text-ern-green';
+          bText.innerHTML = '<span class="font-bold uppercase tracking-wider">Normal Broadcast</span> &mdash; No active alerts. Monitoring all EAS channels.';
+        }
+
+        if (audio && audio.paused && nowPlaying) {
+          nowPlaying.textContent = (currentStreamSource === BACKUP_STREAM_URL) ? 'WJON-IP — Backup Relay' : 'ERN-VTWF — Live Relay';
+          nowPlayingSub.textContent = 'Monitoring emergency alert channels';
+          if (streamDot) streamDot.className = 'w-2 h-2 rounded-full bg-slate-500';
+          if (streamStatusText) {
+            streamStatusText.textContent = 'Paused';
+            streamStatusText.className = 'text-xs font-medium text-slate-400';
+          }
+        }
+      }
+    }
+
+    const PRIMARY_STREAM_URL = '/api/stream/live';
+    const PRIMARY_DIRECT_URL = 'https://icecast.gwes-eas.network/ERN-VTWF';
+    const BACKUP_STREAM_URL  = '/api/stream/wjonip';
+    const BACKUP_DIRECT_URL  = 'https://radio.wjonip.org/wjonip';
+    let currentStreamSource = PRIMARY_STREAM_URL;
+
+    function switchToBackupStream() {
+      const directLink = document.getElementById('direct-stream-link');
+      const directLabel = document.getElementById('direct-stream-label');
+      const relayBadge = document.getElementById('stream-relay-badge');
+      if (directLink) directLink.href = BACKUP_DIRECT_URL;
+      if (directLabel) directLabel.textContent = 'Direct (WJON-IP)';
+      if (relayBadge) relayBadge.textContent = 'WJON-IP Emergency Relay';
+      
+      if (currentStreamSource !== BACKUP_STREAM_URL && audio) {
+        currentStreamSource = BACKUP_STREAM_URL;
+        const wasPlaying = !audio.paused;
+        audio.src = BACKUP_STREAM_URL + '?t=' + Date.now();
+        audio.load();
+        if (wasPlaying) {
+          audio.play().catch(err => console.warn("Backup stream play warning:", err));
+        }
+      }
+    }
+
+    function restorePrimaryStream() {
+      const directLink = document.getElementById('direct-stream-link');
+      const directLabel = document.getElementById('direct-stream-label');
+      const relayBadge = document.getElementById('stream-relay-badge');
+      if (directLink) directLink.href = PRIMARY_DIRECT_URL;
+      if (directLabel) directLabel.textContent = 'Direct (ERN-VTWF)';
+      if (relayBadge) relayBadge.textContent = 'ERN-VTWF Relay';
+
+      if (currentStreamSource !== PRIMARY_STREAM_URL && audio) {
+        currentStreamSource = PRIMARY_STREAM_URL;
+        const wasPlaying = !audio.paused;
+        audio.src = PRIMARY_STREAM_URL + '?t=' + Date.now();
+        audio.load();
+        if (wasPlaying) {
+          audio.play().catch(err => console.warn("Primary stream play warning:", err));
+        }
+      }
+    }
+
+    function getUserSettings() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('ern_user_settings') || '{}');
+        return {
+          tempUnit: saved.tempUnit || 'F',
+          windUnit: saved.windUnit || 'mph',
+          pressureUnit: saved.pressureUnit || 'inHg',
+          radarDefault: saved.radarDefault || 'precipitation_new',
+          timeFormat: saved.timeFormat || '12h',
+          showAnalog: saved.showAnalog || 'show',
+          showFlip: saved.showFlip || 'show',
+          showUtc: saved.showUtc || 'show',
+          stormTransition: saved.stormTransition || 'enabled',
+          showSpectrum: saved.showSpectrum || 'show'
+        };
+      } catch(e) {
+        return { tempUnit: 'F', windUnit: 'mph', pressureUnit: 'inHg', timeFormat: '12h', showAnalog: 'show', showFlip: 'show', showUtc: 'show' };
+      }
+    }
+
+    function applyDisplayPreferences() {
+      const s = getUserSettings();
+      
+      // Analog Clock
+      const analogBox = document.getElementById('analog-clock-svg')?.parentElement;
+      if (analogBox) analogBox.style.display = s.showAnalog === 'hide' ? 'none' : 'flex';
+
+      // Flip Clock
+      const flipBox = document.getElementById('flip-h1')?.closest('.flex.items-center.gap-1');
+      if (flipBox) flipBox.style.display = s.showFlip === 'hide' ? 'none' : 'flex';
+
+      // UTC Clock
+      const utcBox = document.getElementById('utc-clock')?.parentElement;
+      if (utcBox) utcBox.style.display = s.showUtc === 'hide' ? 'none' : 'flex';
+    }
+
+    function updateClocks() {
+      const now = new Date();
+      const s = getUserSettings();
+      
+      // Calculate America/New_York (EDT) time explicitly
+      const nyDateStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+      const nyDate = new Date(nyDateStr);
+
+      // 1. Analog Clock Hands Calculation
+      const sec = nyDate.getSeconds() + (now.getMilliseconds() / 1000);
+      const min = nyDate.getMinutes() + sec / 60;
+      const hour = (nyDate.getHours() % 12) + min / 60;
+
+      const secDeg = sec * 6; // 360 / 60
+      const minDeg = min * 6; // 360 / 60
+      const hourDeg = hour * 30; // 360 / 12
+
+      const hHand = document.getElementById('analog-hour');
+      const mHand = document.getElementById('analog-min');
+      const sHand = document.getElementById('analog-sec');
+
+      if (hHand) hHand.setAttribute('transform', `rotate(${hourDeg} 50 50)`);
+      if (mHand) mHand.setAttribute('transform', `rotate(${minDeg} 50 50)`);
+      if (sHand) sHand.setAttribute('transform', `rotate(${secDeg} 50 50)`);
+
+      // 2. Flip Clock Digits Update (12h vs 24h)
+      let rawHours = nyDate.getHours();
+      if (s.timeFormat === '12h') {
+        rawHours = rawHours % 12;
+        if (rawHours === 0) rawHours = 12;
+      }
+      const hStr = String(rawHours).padStart(2, '0');
+      const mStr = String(nyDate.getMinutes()).padStart(2, '0');
+      const sStr = String(nyDate.getSeconds()).padStart(2, '0');
+
+      const setFlipVal = (id, char) => {
+        const el = document.getElementById(id);
+        if (el) {
+          const span = el.querySelector('span');
+          if (span && span.textContent !== char) {
+            el.classList.remove('flip-anim-down');
+            void el.offsetWidth; // Force reflow
+            el.classList.add('flip-anim-down');
+            setTimeout(() => {
+              span.textContent = char;
+            }, 180);
+            setTimeout(() => {
+              el.classList.remove('flip-anim-down');
+            }, 400);
+          }
+        }
+      };
+
+      setFlipVal('flip-h1', hStr[0]);
+      setFlipVal('flip-h2', hStr[1]);
+      setFlipVal('flip-m1', mStr[0]);
+      setFlipVal('flip-m2', mStr[1]);
+      setFlipVal('flip-s1', sStr[0]);
+      setFlipVal('flip-s2', sStr[1]);
+
+      // 3. UTC Clock
+      const utc = document.getElementById('utc-clock');
+      if (utc) utc.textContent = now.toUTCString().split(' ')[4];
+    }
+    applyDisplayPreferences();
+    updateClocks();
+    setInterval(updateClocks, 250); // High-frequency smooth hand/flip clock tick
+    applyStatusUI();
+    syncAnnouncementsAndStatus();
+    setInterval(syncAnnouncementsAndStatus, 5000);
+
+    audio.volume = 0.75;
+    
+    // ===== REAL-TIME WEB AUDIO API RF SPECTRUM ANALYSER & VU METER =====
+    let audioCtx = null;
+    let analyser = null;
+    let sourceNode = null;
+    let animFrameId = null;
+    const canvas = document.getElementById('audio-spectrum-canvas');
+    const canvasCtx = canvas ? canvas.getContext('2d') : null;
+    const spectrumDot = document.getElementById('spectrum-live-dot');
+    const spectrumText = document.getElementById('spectrum-status-text');
+    const vuBar = document.getElementById('audio-vu-bar');
+    const dbText = document.getElementById('audio-db-text');
+
+    function initWebAudioAnalyser() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          try {
+            audioCtx = new AudioContextClass();
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+            analyser.smoothingTimeConstant = 0.8;
+
+            if (!sourceNode && audio) {
+              sourceNode = audioCtx.createMediaElementSource(audio);
+              sourceNode.connect(analyser);
+              analyser.connect(audioCtx.destination);
+            }
+          } catch(e) {
+            console.warn("Web Audio Analyser init warning:", e);
+          }
+        }
+      }
+    }
+
+    let fakePhase = 0;
+    function drawSpectrumLoop() {
+      if (!canvasCtx || audio.paused) return;
+
+      const bufferLength = analyser ? analyser.frequencyBinCount : 32;
+      const dataArray = new Uint8Array(bufferLength);
+
+      let isRealAnalyser = false;
+      if (analyser) {
+        try {
+          analyser.getByteFrequencyData(dataArray);
+          for (let i = 0; i < bufferLength; i++) {
+            if (dataArray[i] > 0) { isRealAnalyser = true; break; }
+          }
+        } catch(e) {}
+      }
+
+      // If audio element is muted or CORS-blocked, fallback to procedural audio synthesis
+      if (!isRealAnalyser) {
+        fakePhase += 0.15;
+        for (let i = 0; i < bufferLength; i++) {
+          const bassBoost = Math.max(0, (12 - i) * 8);
+          const wave1 = Math.sin(fakePhase + i * 0.4) * 45;
+          const wave2 = Math.cos(fakePhase * 1.3 + i * 0.7) * 35;
+          const noise = (Math.random() * 30);
+          dataArray[i] = Math.max(15, Math.min(240, 80 + bassBoost + wave1 + wave2 + noise));
+        }
+      }
+
+      canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = (canvas.width / bufferLength) * 0.85;
+      let x = 1;
+      let totalEnergy = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = (dataArray[i] / 255) * (canvas.height - 2);
+        totalEnergy += dataArray[i];
+
+        // Frequency gradient: Green -> Amber -> Red at peaks
+        let fillColor = '#22c55e'; // Green
+        if (dataArray[i] > 200) fillColor = '#ef4444'; // Red peak
+        else if (dataArray[i] > 140) fillColor = '#f59e0b'; // Amber mid
+
+        canvasCtx.fillStyle = fillColor;
+        canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 1.5;
+      }
+
+      // Calculate RMS / peak level
+      const avg = totalEnergy / bufferLength;
+      const peakPercent = Math.min(100, Math.round((avg / 200) * 100));
+      if (vuBar) {
+        vuBar.style.width = `${peakPercent}%`;
+        vuBar.className = peakPercent > 85 ? 'bg-red-500 h-full' : (peakPercent > 60 ? 'bg-amber-400 h-full' : 'bg-ern-green h-full');
+      }
+      if (dbText) {
+        const db = avg > 0 ? (20 * Math.log10(avg / 255)).toFixed(1) : '-∞';
+        dbText.textContent = `${db} dB`;
+      }
+
+      animFrameId = requestAnimationFrame(drawSpectrumLoop);
+    }
+
+    // Initialize default audio player src to the active stream source
+    if (isOffline) {
+      currentStreamSource = BACKUP_STREAM_URL;
+      audio.src = BACKUP_STREAM_URL;
+    } else {
+      currentStreamSource = PRIMARY_STREAM_URL;
+      audio.src = PRIMARY_STREAM_URL;
+    }
+
+    playBtn.addEventListener('click', () => { 
+      initWebAudioAnalyser();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      if (audio.paused) { 
+        if (!audio.src || audio.src === window.location.href) {
+          audio.src = currentStreamSource;
+        }
+        audio.play().catch(err => {
+          console.warn("Play interrupted or failed:", err);
+          if (currentStreamSource === PRIMARY_STREAM_URL) {
+            switchToBackupStream();
+          }
+        }); 
+      } else { 
+        audio.pause(); 
+      } 
+    });
+
+    audio.addEventListener('play', () => { 
+      playIcon.classList.add('hidden'); 
+      pauseIcon.classList.remove('hidden'); 
+      playBtn.classList.remove('bg-ern-green'); 
+      playBtn.classList.add('bg-ern-amber'); 
+      streamDot.classList.remove('bg-slate-500'); 
+      streamDot.classList.add('bg-ern-green'); 
+      streamStatusText.textContent = 'Live'; 
+      streamStatusText.classList.remove('text-slate-400'); 
+      streamStatusText.classList.add('text-ern-green'); 
+      if (isOffline || currentStreamSource === BACKUP_STREAM_URL) {
+        nowPlaying.textContent = 'WJON-IP — Broadcasting Backup Relay'; 
+        nowPlayingSub.textContent = 'Streaming emergency backup feed from WJON-IP'; 
+      } else {
+        nowPlaying.textContent = 'ERN-VTWF — Broadcasting Live'; 
+        nowPlayingSub.textContent = 'Streaming emergency alert relay'; 
+      }
+
+      if (spectrumDot) { spectrumDot.className = 'w-2 h-2 rounded-full bg-ern-green animate-pulse'; }
+      if (spectrumText) { spectrumText.innerHTML = 'RF Spectrum &bull; Active (44.1kHz)'; spectrumText.className = 'text-[11px] font-mono text-emerald-400 uppercase tracking-wider'; }
+      
+      initWebAudioAnalyser();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      cancelAnimationFrame(animFrameId);
+      drawSpectrumLoop();
+    });
+
+    audio.addEventListener('playing', () => {
+      streamDot.classList.remove('bg-slate-500', 'bg-amber-400', 'bg-ern-red');
+      streamDot.classList.add('bg-ern-green');
+      streamStatusText.textContent = 'Live';
+      streamStatusText.className = 'text-xs font-medium text-ern-green';
+    });
+
+    audio.addEventListener('pause', () => { 
+      playIcon.classList.remove('hidden'); 
+      pauseIcon.classList.add('hidden'); 
+      playBtn.classList.add('bg-ern-green'); 
+      playBtn.classList.remove('bg-ern-amber'); 
+      streamDot.classList.remove('bg-ern-green'); 
+      streamDot.classList.add('bg-slate-500'); 
+      streamStatusText.textContent = 'Paused'; 
+      streamStatusText.classList.remove('text-ern-green'); 
+      streamStatusText.classList.add('text-slate-400'); 
+      nowPlaying.textContent = isOffline ? 'WJON-IP — Backup Relay' : 'ERN-VTWF — Live Relay'; 
+      nowPlayingSub.textContent = 'Stream paused'; 
+
+      if (spectrumDot) { spectrumDot.className = 'w-2 h-2 rounded-full bg-slate-500'; }
+      if (spectrumText) { spectrumText.innerHTML = 'RF Spectrum Analyser &bull; Standby'; spectrumText.className = 'text-[11px] font-mono text-slate-400 uppercase tracking-wider'; }
+      cancelAnimationFrame(animFrameId);
+      if (canvasCtx) canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+      if (vuBar) vuBar.style.width = '0%';
+      if (dbText) dbText.textContent = '-∞ dB';
+    });
+
+    let autoReconnectTimer = null;
+    audio.addEventListener('error', (e) => { 
+      console.warn("Audio element error event:", audio.error);
+      if (currentStreamSource === PRIMARY_STREAM_URL) {
+        console.warn("Primary stream failed. Hot-swapping to WJON-IP backup stream...");
+        switchToBackupStream();
+        return;
+      } else if (currentStreamSource === BACKUP_STREAM_URL) {
+        console.warn("Backup proxy failed. Trying direct stream fallback...");
+        currentStreamSource = BACKUP_DIRECT_URL;
+        audio.src = BACKUP_DIRECT_URL;
+        audio.load();
+        audio.play().catch(err => console.warn("Direct stream play warning:", err));
+        return;
+      }
+      
+      streamDot.classList.remove('bg-ern-green'); 
+      streamDot.classList.add('bg-ern-red'); 
+      streamStatusText.textContent = 'Reconnecting...'; 
+      streamStatusText.className = 'text-xs font-medium text-amber-400';
+
+      clearTimeout(autoReconnectTimer);
+      autoReconnectTimer = setTimeout(() => {
+        console.log("Attempting stream auto-reconnect...");
+        audio.src = currentStreamSource + (currentStreamSource.includes('?') ? '&' : '?') + 't=' + Date.now();
+        audio.load();
+        audio.play().catch(err => console.warn("Auto-reconnect play warning:", err));
+      }, 3000);
+    });
+
+    audio.addEventListener('stalled', () => {
+      if (!audio.paused) {
+        streamStatusText.textContent = 'Buffering...'; 
+        streamStatusText.className = 'text-xs font-medium text-amber-400';
+      }
+    });
+
+    audio.addEventListener('waiting', () => { 
+      if (!audio.paused) {
+        streamStatusText.textContent = 'Buffering...'; 
+        streamStatusText.className = 'text-xs font-medium text-amber-400';
+      }
+    });
+    muteBtn.addEventListener('click', () => { audio.muted = !audio.muted; if (audio.muted) { volIcon.classList.add('hidden'); muteIcon.classList.remove('hidden'); } else { volIcon.classList.remove('hidden'); muteIcon.classList.add('hidden'); } });
+    volumeSlider.addEventListener('input', (e) => { const vol = e.target.value; audio.volume = vol / 100; audio.muted = vol == 0; volumeText.textContent = vol + '%'; if (vol == 0) { volIcon.classList.add('hidden'); muteIcon.classList.remove('hidden'); } else { volIcon.classList.remove('hidden'); muteIcon.classList.add('hidden'); } });
+    
+    // ===== ULTRA-FAST NOW PLAYING & ALBUM ARTWORK SYNC =====
+    const albumCover = document.getElementById('album-cover');
+    const trackBadge = document.getElementById('track-badge');
+    const trackTitle = document.getElementById('track-title');
+    const trackArtist = document.getElementById('track-artist');
+    const trackAlbum = document.getElementById('track-album');
+    const trackListeners = document.getElementById('track-listeners');
+    const vinylGlow = document.getElementById('cover-vinyl-glow');
+    let lastTrackRaw = '';
+
+    const DEFAULT_COVER = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231e293b'/><circle cx='50' cy='50' r='35' fill='%230f172a' stroke='%23334155' stroke-width='4'/><circle cx='50' cy='50' r='12' fill='%23ef4444'/><circle cx='50' cy='50' r='4' fill='white'/></svg>";
+
+    async function syncNowPlayingMetadata() {
+      try {
+        const res = await fetch('/api/nowplaying?t=' + Date.now(), { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+
+          // 1. Primary Station Mount Failover & Banner Detection
+          const primaryLive = data && data.isPrimaryActive;
+          if (primaryLive) {
+            isOffline = false;
+            // Hide backup failover banner if currently showing
+            const bnr = document.getElementById('emergency-banner');
+            if (bnr && bnr.dataset.isFailover) {
+              setNormalState();
+              delete bnr.dataset.isFailover;
+            }
+            if (currentStreamSource !== '/api/stream/live' && audio) {
+              currentStreamSource = '/api/stream/live';
+              const wasPlaying = !audio.paused;
+              if (!audio.src.includes('/api/stream/live')) {
+                audio.src = '/api/stream/live';
+                audio.load();
+                if (wasPlaying) audio.play().catch(() => {});
+              }
+            }
+          } else {
+            // Primary stream is offline; trigger backup failover
+            isOffline = true;
+            if (currentStreamSource !== BACKUP_STREAM_URL && audio) {
+              currentStreamSource = BACKUP_STREAM_URL;
+              const wasPlaying = !audio.paused;
+              if (!audio.src.includes(BACKUP_STREAM_URL) && !audio.src.includes(BACKUP_DIRECT_URL)) {
+                audio.src = BACKUP_STREAM_URL;
+                audio.load();
+                if (wasPlaying) audio.play().catch(() => {});
+              }
+            }
+          }
+
+          // 2. Auto-decode any live EAS alert received in stream metadata (Strict ZCZC Only)
+          if (data && data.alert && data.alert.rawZczc) {
+            const al = data.alert;
+            const decoded = parseZczcHeader(al.rawZczc, al.station || 'WJON-IP');
+            if (decoded) {
+              const isDup = alertEntries.some(e => e.code === decoded.code && (Date.now() - e.timeMs < 300000));
+              if (!isDup) {
+                addDecodedAlert(decoded.code, decoded.org, decoded.fips, decoded.eventName, decoded.expiresAtEpoch, decoded.station, null, al.rawZczc);
+              }
+            }
+          }
+
+          // 3. Inject Title into Track Display
+          if (data && data.track) {
+            let rawTrack = data.track;
+            if (rawTrack === 'WJON IP Persistant Monitors') {
+              rawTrack = 'WJON IP Persistent Monitors';
+            }
+            
+            const raw = `${data.artist || ''} - ${rawTrack}`;
+            if (raw !== lastTrackRaw) {
+              lastTrackRaw = raw;
+              trackTitle.textContent = rawTrack;
+              trackArtist.textContent = data.artist ? data.artist : (data.station || 'EAS Relay Network');
+              trackAlbum.textContent = data.album ? `Album: ${data.album}` : '';
+              trackBadge.textContent = data.isPrimaryActive ? 'PRIMARY LIVE' : 'BACKUP LIVE';
+              trackBadge.className = data.isPrimaryActive ? 'px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-ern-green/20 text-ern-green' : 'px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-amber-500/20 text-amber-400';
+              if (data.listeners) {
+                trackListeners.textContent = `• ${data.listeners} listener${data.listeners === 1 ? '' : 's'}`;
+              }
+
+              if (data.artwork) {
+                albumCover.src = data.artwork;
+                vinylGlow.classList.remove('hidden');
+              } else {
+                albumCover.src = DEFAULT_COVER;
+                vinylGlow.classList.add('hidden');
+              }
+            }
+            return;
+          }
+        }
+      } catch(e) {}
+
+      // Fallback if no title detected
+      if (lastTrackRaw !== 'default') {
+        lastTrackRaw = 'default';
+        trackTitle.textContent = isOffline ? 'WJON-IP — Backup Relay' : 'ERN-VTWF — Live Relay';
+        trackArtist.textContent = isOffline ? 'Secondary Emergency Broadcast' : 'EAS Relay Network • New York City';
+        trackAlbum.textContent = '';
+        trackBadge.textContent = isOffline ? 'BACKUP LIVE' : 'LIVE RELAY';
+        trackBadge.className = isOffline ? 'px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-amber-500/20 text-amber-400' : 'px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-ern-green/20 text-ern-green';
+        trackListeners.textContent = '';
+        albumCover.src = DEFAULT_COVER;
+        vinylGlow.classList.add('hidden');
+      }
+    }
+
+    syncNowPlayingMetadata();
+    setInterval(syncNowPlayingMetadata, 10000); // 10s failover & metadata polling loop
+
+    document.querySelectorAll('.script-tab').forEach(btn => { btn.addEventListener('click', () => { const target = document.getElementById(btn.dataset.target); const chevron = btn.querySelector('.chevron'); target.classList.toggle('hidden'); chevron.classList.toggle('rotate-180'); }); });
+    document.querySelectorAll('.copy-script').forEach(btn => { btn.addEventListener('click', () => { const target = document.getElementById(btn.dataset.target); const text = target.querySelector('p').textContent; navigator.clipboard.writeText(text).then(() => { const original = btn.innerHTML; btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!'; setTimeout(() => { btn.innerHTML = original; }, 2000); }); }); });
+    function setNormalState() {
+      alertActive = false;
+      applyStatusUI();
+      bannerTime.textContent = '';
+    }
+    function setAlertState(eventCode, eventText) { alertActive = true; bannerEl.className = 'bg-ern-red/10 border-b border-ern-red/40 transition-all duration-500'; bannerIcon.className = 'flex-shrink-0 w-8 h-8 rounded-lg bg-ern-red/20 flex items-center justify-center pulse-red'; bannerIcon.innerHTML = '<svg class="w-5 h-5 text-ern-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>'; bannerText.className = 'text-sm font-medium text-ern-red'; bannerText.innerHTML = '<span class="font-bold uppercase tracking-wider blink">Active Broadcast Alert</span> &mdash; ' + eventCode + ': ' + eventText; statusBadge.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-ern-red/10 border border-ern-red/40'; statusBadge.querySelector('span:first-child').className = 'w-2.5 h-2.5 rounded-full bg-ern-red blink'; statusText.className = 'text-xs font-bold text-ern-red uppercase tracking-wider'; statusText.textContent = 'Active Broadcast Alert'; infoStatus.className = 'text-sm font-semibold text-ern-red'; infoStatus.textContent = 'Alert Active'; bannerTime.textContent = new Date().toLocaleTimeString('en-US', { hour12: false }) + ' LOCAL'; }
+    const logTableBody = document.getElementById('log-table-body'); 
+    const logCount = document.getElementById('log-count');
+    const eventCodes = { 
+      // National & Civil Emergencies
+      'EAN': { name: 'Emergency Action Notification', color: 'red', durationMin: 120 },
+      'EAT': { name: 'Emergency Action Termination', color: 'green', durationMin: 15 },
+      'NIC': { name: 'National Information Center', color: 'red', durationMin: 60 },
+      'NPT': { name: 'National Periodic Test', color: 'green', durationMin: 15 },
+      'RMT': { name: 'Required Monthly Test', color: 'amber', durationMin: 30 },
+      'RWT': { name: 'Required Weekly Test', color: 'green', durationMin: 15 },
+      'DMO': { name: 'Practice / Demo Warning', color: 'green', durationMin: 15 },
+      'CEM': { name: 'Civil Emergency Message', color: 'red', durationMin: 60 },
+      'CIV': { name: 'Civil Emergency Message', color: 'red', durationMin: 60 },
+      'EVI': { name: 'Evacuation Immediate', color: 'red', durationMin: 120 },
+      'EVA': { name: 'Evacuation Immediate', color: 'red', durationMin: 120 },
+      'CAE': { name: 'Child Abduction Emergency', color: 'red', durationMin: 60 },
+      'BLU': { name: 'Blue Alert', color: 'amber', durationMin: 60 },
+      'ADR': { name: 'Administrative Message', color: 'green', durationMin: 30 },
+      'CDW': { name: 'Civil Danger Warning', color: 'red', durationMin: 60 },
+      'LAE': { name: 'Local Area Emergency', color: 'red', durationMin: 60 },
+      'TOE': { name: '911 Telephone Outage Emergency', color: 'amber', durationMin: 60 },
+      'SPW': { name: 'Shelter in Place Warning', color: 'red', durationMin: 60 },
+      'AVW': { name: 'Avalanche Warning', color: 'red', durationMin: 60 },
+      'AVA': { name: 'Avalanche Watch', color: 'amber', durationMin: 120 },
+      'FRW': { name: 'Fire Warning', color: 'red', durationMin: 60 },
+      'HMW': { name: 'Hazardous Materials Warning', color: 'red', durationMin: 60 },
+      'NUW': { name: 'Nuclear Power Plant Warning', color: 'red', durationMin: 120 },
+      'RHW': { name: 'Radiological Hazard Warning', color: 'red', durationMin: 120 },
+      'VOW': { name: 'Volcano Warning', color: 'red', durationMin: 120 },
+
+      // Severe Weather & Convective Warnings
+      'TOR': { name: 'Tornado Warning', color: 'red', durationMin: 45 },
+      'TOA': { name: 'Tornado Watch', color: 'amber', durationMin: 120 },
+      'TOW': { name: 'Tornado Watch', color: 'amber', durationMin: 120 },
+      'SVR': { name: 'Severe Thunderstorm Warning', color: 'amber', durationMin: 45 },
+      'SVA': { name: 'Severe Thunderstorm Watch', color: 'amber', durationMin: 120 },
+      'SVS': { name: 'Severe Weather Statement', color: 'amber', durationMin: 30 },
+      'SPS': { name: 'Special Weather Statement', color: 'amber', durationMin: 45 },
+      'EWW': { name: 'Extreme Wind Warning', color: 'red', durationMin: 60 },
+      'HWW': { name: 'High Wind Warning', color: 'amber', durationMin: 60 },
+      'HWA': { name: 'High Wind Watch', color: 'amber', durationMin: 120 },
+      'WND': { name: 'Wind Advisory', color: 'amber', durationMin: 60 },
+
+      // Flooding & Hydrological Warnings
+      'FFW': { name: 'Flash Flood Warning', color: 'red', durationMin: 60 },
+      'FFA': { name: 'Flash Flood Watch', color: 'amber', durationMin: 120 },
+      'FFS': { name: 'Flash Flood Statement', color: 'amber', durationMin: 45 },
+      'FLW': { name: 'Flood Warning', color: 'amber', durationMin: 60 },
+      'FLA': { name: 'Flood Watch', color: 'amber', durationMin: 120 },
+      'FLS': { name: 'Flood Statement', color: 'amber', durationMin: 45 },
+
+      // Winter & Freezing Weather
+      'BZW': { name: 'Blizzard Warning', color: 'red', durationMin: 120 },
+      'WSW': { name: 'Winter Storm Warning', color: 'amber', durationMin: 120 },
+      'WSA': { name: 'Winter Storm Watch', color: 'amber', durationMin: 120 },
+      'WWY': { name: 'Winter Weather Advisory', color: 'amber', durationMin: 60 },
+      'ISW': { name: 'Ice Storm Warning', color: 'red', durationMin: 120 },
+      'LEW': { name: 'Lake Effect Snow Warning', color: 'amber', durationMin: 120 },
+      'FZW': { name: 'Freeze Warning', color: 'amber', durationMin: 60 },
+      'FZA': { name: 'Freeze Watch', color: 'amber', durationMin: 120 },
+      'FRZ': { name: 'Frost Advisory', color: 'green', durationMin: 60 },
+      'WCW': { name: 'Wind Chill Warning', color: 'amber', durationMin: 60 },
+      'WCA': { name: 'Wind Chill Watch', color: 'amber', durationMin: 120 },
+
+      // Tropical & Marine
+      'HUW': { name: 'Hurricane Warning', color: 'red', durationMin: 120 },
+      'HUA': { name: 'Hurricane Watch', color: 'amber', durationMin: 180 },
+      'HLS': { name: 'Hurricane Local Statement', color: 'amber', durationMin: 60 },
+      'TRW': { name: 'Tropical Storm Warning', color: 'red', durationMin: 120 },
+      'TRA': { name: 'Tropical Storm Watch', color: 'amber', durationMin: 180 },
+      'TYW': { name: 'Typhoon Warning', color: 'red', durationMin: 120 },
+      'TYA': { name: 'Typhoon Watch', color: 'amber', durationMin: 180 },
+      'SMW': { name: 'Special Marine Warning', color: 'amber', durationMin: 45 },
+      'MWW': { name: 'Marine Weather Warning', color: 'amber', durationMin: 60 },
+      'MWA': { name: 'Marine Weather Watch', color: 'amber', durationMin: 120 },
+      'MAW': { name: 'Marine Warning', color: 'amber', durationMin: 60 },
+      'TSW': { name: 'Tsunami Warning', color: 'red', durationMin: 120 },
+      'TSA': { name: 'Tsunami Watch', color: 'amber', durationMin: 180 },
+
+      // Fire & Heat
+      'FWW': { name: 'Red Flag Fire Weather Warning', color: 'red', durationMin: 60 },
+      'FWA': { name: 'Fire Weather Watch', color: 'amber', durationMin: 120 },
+      'EHW': { name: 'Excessive Heat Warning', color: 'amber', durationMin: 120 },
+      'EHA': { name: 'Excessive Heat Watch', color: 'amber', durationMin: 120 },
+      'HTA': { name: 'Heat Advisory', color: 'amber', durationMin: 60 },
+      'DSW': { name: 'Dust Storm Warning', color: 'amber', durationMin: 60 },
+      'SQW': { name: 'Snow Squall Warning', color: 'red', durationMin: 45 },
+      'WXR': { name: 'Weather Alert Message', color: 'amber', durationMin: 30 }
+    };
+    
+    // ===== EAS SCHEMA VERSIONING & AUTO-PURGE =====
+    const EAS_STORAGE_KEY = 'EAS_ALERTS_V4';
+
+    try {
+      localStorage.removeItem('ern_decoded_alerts');
+      localStorage.removeItem('EAS_ALERTS_V1');
+      localStorage.removeItem('EAS_ALERTS_V2');
+      localStorage.removeItem('EAS_ALERTS_V3');
+    } catch(e) {}
+
+    let alertEntries = [];
+    try {
+      const rawStored = localStorage.getItem(EAS_STORAGE_KEY);
+      if (rawStored) {
+        const parsed = JSON.parse(rawStored);
+        if (Array.isArray(parsed)) {
+          alertEntries = parsed.filter(e => e && typeof e.expiresAtEpoch === 'number' && e.expiresAtEpoch > 0 && e.fips && e.fips !== 'United States');
+        }
+      }
+    } catch(e) {
+      alertEntries = [];
+    }
+
+    async function saveAlertEntries(pushToServer = true) {
+      localStorage.setItem(EAS_STORAGE_KEY, JSON.stringify(alertEntries));
+      if (pushToServer && alertEntries.length > 0) {
+        try {
+          await fetch('/api/decoded-alerts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(alertEntries[0])
+          });
+        } catch(e) {}
+      }
+    }
+
+    async function fetchGlobalDecodedAlerts() {
+      try {
+        const res = await fetch('/api/decoded-alerts', { cache: 'no-store' });
+        if (res.ok) {
+          const serverAlerts = await res.json();
+          if (Array.isArray(serverAlerts)) {
+            if (serverAlerts.length === 0 && alertEntries.length > 0) {
+              // Server was cleared!
+              alertEntries = [];
+              saveAlertEntries(false);
+              renderLog();
+              updateRadarAlertPolygons();
+              setNormalState();
+              return;
+            }
+            let changed = false;
+            serverAlerts.forEach(sa => {
+              const exists = alertEntries.some(a => (a.code === sa.code && a.fips === sa.fips && Math.abs(a.timeMs - sa.timeMs) < 600000));
+              if (!exists) {
+                alertEntries.push(sa);
+                changed = true;
+              }
+            });
+            if (changed) {
+              alertEntries.sort((a, b) => b.timeMs - a.timeMs);
+              if (alertEntries.length > 50) alertEntries = alertEntries.slice(0, 50);
+              saveAlertEntries(false);
+              renderLog();
+              updateRadarAlertPolygons();
+            }
+          }
+        }
+      } catch(e) {}
+    }
+    fetchGlobalDecodedAlerts();
+    setInterval(fetchGlobalDecodedAlerts, 5000); // Check server-wide decoded alerts every 5s across all phones
+
+    // Clear active alerts listener
+    const clearBtn = document.getElementById('clear-alerts-btn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', async () => {
+        alertEntries = [];
+        localStorage.removeItem('ern_decoded_alerts');
+        try {
+          await fetch('/api/decoded-alerts', { method: 'DELETE' });
+        } catch(e) {}
+        renderLog();
+        updateRadarAlertPolygons();
+        setNormalState();
+      });
+    }
+    
+    function colorClasses(color) { 
+      switch(color) { 
+        case 'green': return { badge: 'bg-ern-green/20 text-ern-green border border-ern-green/30', status: 'text-ern-green' }; 
+        case 'amber': return { badge: 'bg-ern-amber/20 text-ern-amber border border-ern-amber/30', status: 'text-ern-amber' }; 
+        case 'red': return { badge: 'bg-ern-red/20 text-ern-red border border-ern-red/30', status: 'text-ern-red' }; 
+        default: return { badge: 'bg-slate-700 text-slate-300', status: 'text-slate-400' }; 
+      } 
+    }
+
+    function addDecodedAlert(code, org, fips, eventName, expiresAtMs, stationId, geometry, rawHeaderStr) {
+      // If raw header string was passed, always parse through parseZczcHeader first
+      let fipsList = null;
+      if (rawHeaderStr && rawHeaderStr.includes('ZCZC-')) {
+        const parsed = parseZczcHeader(rawHeaderStr, stationId);
+        if (parsed) {
+          code = parsed.code;
+          org = parsed.org;
+          fips = parsed.fips;
+          fipsList = parsed.fipsList;
+          eventName = parsed.eventName;
+          expiresAtMs = parsed.expiresAtEpoch;
+          stationId = parsed.station;
+        } else {
+          console.warn('[EAS Parser] Discarding malformed chunk and blocking phantom row:', rawHeaderStr);
+          return;
+        }
+      }
+
+      const eventInfo = eventCodes[code] || { name: eventName || 'Emergency Alert', color: 'red', durationMin: 45 };
+      const nowMs = Date.now();
+      
+      // Strict: Never add duration to Date.now() when a valid epoch is provided
+      const expires = (typeof expiresAtMs === 'number' && expiresAtMs > 0) ? expiresAtMs : (Math.floor(nowMs / 60000) * 60000 + (eventInfo.durationMin * 60 * 1000));
+      
+      const currentStation = stationId || (isOffline || currentStreamSource === BACKUP_STREAM_URL ? 'WJON-IP' : 'ERN-VTWF');
+      
+      // Strict FIPS resolution: never output "United States"
+      let resolvedFips = fips;
+      if (!resolvedFips || resolvedFips === 'United States') {
+        resolvedFips = decodeFipsLocation(fips || (currentStation.includes('WJON') ? '051059' : '036061'));
+      }
+
+      // Ensure fipsList always has raw numeric FIPS codes for map lookups
+      if (!fipsList || fipsList.length === 0) {
+        const extractedDigits = (fips || '').replace(/[^0-9]/g, '');
+        if (extractedDigits.length >= 5) {
+          fipsList = [extractedDigits.padStart(6, '0').substring(0, 6)];
+        } else {
+          fipsList = [currentStation.includes('WJON') ? '051059' : '036061'];
+        }
+      }
+
+      // 10-Second EAS 3-Burst Deduplication
+      const isDuplicate = alertEntries.some(e => 
+        e.code === code && 
+        e.fips === resolvedFips && 
+        Math.abs(nowMs - e.timeMs) <= 12000
+      );
+      if (isDuplicate) {
+        return; // Ignore the repeat burst
+      }
+
+      const newEntry = {
+        id: 'alert_' + nowMs + '_' + Math.random().toString(36).substring(2, 6),
+        station: currentStation,
+        timeMs: nowMs,
+        code: code,
+        eventName: eventName || eventInfo.name,
+        color: eventInfo.color,
+        originator: org || 'EAS/NWS',
+        fips: resolvedFips,
+        fipsList: fipsList,
+        geometry: (geometry && geometry.coordinates) ? geometry : null,
+        expiresAtEpoch: expires,
+        expiresAt: expires,
+        expiresMs: expires
+      };
+
+      alertEntries.unshift(newEntry);
+      if (alertEntries.length > 50) alertEntries.pop();
+      saveAlertEntries();
+      renderLog();
+      setAlertState(code, newEntry.eventName);
+      
+      const targetCentroid = getFipsCentroid(newEntry.fips);
+      updateRadarAlertPolygons(targetCentroid);
+
+      // Update Live ZCZC Decoder Terminal Window
+      const rawWindow = document.getElementById('zczc-raw-display');
+      const orgEl = document.getElementById('zczc-decoded-org');
+      const eventEl = document.getElementById('zczc-decoded-event');
+      const fipsEl = document.getElementById('zczc-decoded-fips');
+      const timeEl = document.getElementById('zczc-decoded-time');
+
+      if (rawWindow) {
+        const sampleHeader = `ZCZC-${cleanOrg}-${newEntry.code}-${validFips}+0045-${new Date(nowMs).getUTCDay()}${String(new Date(nowMs).getUTCHours()).padStart(2, '0')}${String(new Date(nowMs).getUTCMinutes()).padStart(2, '0')}-${newEntry.station}/EAS-`;
+        rawWindow.innerHTML = `<span class="text-white font-bold">${sampleHeader}</span>`;
+      }
+      if (orgEl) orgEl.textContent = `${newEntry.originator} (${newEntry.station})`;
+      if (eventEl) eventEl.textContent = `${newEntry.code} (${newEntry.eventName})`;
+      if (fipsEl) fipsEl.textContent = newEntry.fips;
+      if (timeEl) timeEl.textContent = `${Math.round((expires - nowMs) / 60000)} min`;
+    }
+    
+    // ===== LIVE DECODER TERMINAL & CARD SYNC =====
+    function updateDecoderDashboardCards(parsed, rawHeaderStr) {
+      const rawWindow = document.getElementById('zczc-raw-display');
+      const orgEl = document.getElementById('zczc-decoded-org');
+      const eventEl = document.getElementById('zczc-decoded-event');
+      const fipsEl = document.getElementById('zczc-decoded-fips');
+      const timeEl = document.getElementById('zczc-decoded-time');
+
+      if (rawHeaderStr && rawWindow) {
+        rawWindow.innerHTML = `<span class="text-white font-bold">${rawHeaderStr}</span>`;
+      }
+
+      if (!parsed) {
+        // Fallback: extract any identifiable tokens from the raw string
+        console.warn('[EAS Parser] Header failed strict regex:', rawHeaderStr);
+        if (rawHeaderStr && rawHeaderStr.startsWith('ZCZC')) {
+          const parts = rawHeaderStr.split('-');
+          if (orgEl && parts[1]) orgEl.textContent = parts[1].trim() || 'EAS';
+          if (eventEl && parts[2]) eventEl.textContent = parts[2].trim() || 'EMG';
+          if (fipsEl && parts[3]) {
+            const rawFipsToken = (parts[3].split('+')[0] || '').replace(/[^0-9]/g, '');
+            fipsEl.textContent = rawFipsToken.length >= 5 ? decodeFipsLocation(rawFipsToken) : 'Unknown Area (FIPS Missing)';
+          }
+          if (timeEl && parts[3] && parts[3].includes('+')) {
+            const dur = parts[3].split('+')[1];
+            timeEl.textContent = dur ? `+${dur} (Testing)` : 'Standby';
+          }
+        }
+        return;
+      }
+
+      if (orgEl) orgEl.textContent = `${parsed.org || 'EAS'} (${parsed.station || 'ERN-VTWF'})`;
+      if (eventEl) eventEl.textContent = `${parsed.code} (${parsed.eventName || 'Emergency Alert'})`;
+      if (fipsEl) fipsEl.textContent = parsed.fips || 'National / All Areas';
+      if (timeEl) {
+        const remainingMs = (parsed.expiresAtEpoch || parsed.expiresMs) ? ((parsed.expiresAtEpoch || parsed.expiresMs) - Date.now()) : 0;
+        const mins = Math.max(0, Math.floor(remainingMs / 60000));
+        timeEl.textContent = mins > 0 ? `${mins} min` : 'Active';
+      }
+    }
+
+    function renderLog() { 
+      if (!logTableBody) return;
+      let rawAlerts = alertEntries;
+
+      logTableBody.innerHTML = ''; 
+      if (alertEntries.length === 0) {
+        logTableBody.innerHTML = '<div class="px-4 py-8 text-center text-slate-500 text-sm italic flex flex-col items-center justify-center gap-1"><div>Monitoring ERN-VTWF &amp; WJON-IP live EAS feeds...</div><div class="text-[11px] text-slate-600 font-mono mt-1">Standby for emergency activation</div></div>';
+        if (logCount) logCount.textContent = '0 transmissions logged';
+        if (alertActive) setNormalState();
+
+        const rawWindow = document.getElementById('zczc-raw-display');
+        const orgEl = document.getElementById('zczc-decoded-org');
+        const eventEl = document.getElementById('zczc-decoded-event');
+        const fipsEl = document.getElementById('zczc-decoded-fips');
+        const timeEl = document.getElementById('zczc-decoded-time');
+        if (rawWindow && !rawWindow.textContent.includes('ZCZC-')) {
+          rawWindow.innerHTML = '<span class="text-slate-500 italic">Listening for ZCZC preamble bursts (ERN-VTWF &bull; WJON-IP)...</span>';
+        }
+        if (orgEl && !alertEntries.length && (!rawWindow || !rawWindow.textContent.includes('ZCZC-'))) orgEl.textContent = '--';
+        if (eventEl && !alertEntries.length && (!rawWindow || !rawWindow.textContent.includes('ZCZC-'))) eventEl.textContent = '--';
+        if (fipsEl && !alertEntries.length && (!rawWindow || !rawWindow.textContent.includes('ZCZC-'))) fipsEl.textContent = '--';
+        if (timeEl && !alertEntries.length && (!rawWindow || !rawWindow.textContent.includes('ZCZC-'))) timeEl.textContent = 'Standby';
+        return;
+      }
+
+      const now = Date.now();
+      let hasActiveAlert = false;
+
+      alertEntries.forEach((entry, idx) => { 
+        const cc = colorClasses(entry.color); 
+        const timeStr = new Date(entry.timeMs).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); 
+        const stName = entry.station || (isOffline ? 'WJON-IP' : 'ERN-VTWF');
+        const stClass = stName.includes('WJON') ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+
+        // Static immutable countdown tick
+        const expEpoch = entry.expiresAtEpoch || entry.expiresAt || entry.expiresMs || entry.expires || (entry.timeMs + 45 * 60000);
+        const remainingMs = expEpoch - now;
+        const remainingSec = Math.max(0, Math.floor(remainingMs / 1000));
+        let statusHtml = '';
+        const expTimeStr = new Date(expEpoch).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+        if (remainingMs > 0) {
+          hasActiveAlert = true;
+          const hours = Math.floor(remainingSec / 3600);
+          const mins = Math.floor((remainingSec % 3600) / 60);
+          const secs = remainingSec % 60;
+          const countdownStr = hours > 0 
+            ? `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+            : `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+          statusHtml = `
+            <div class="px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-semibold whitespace-nowrap inline-flex flex-col gap-0.5">
+              <span class="flex items-center gap-1.5 font-mono font-bold">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                Active &bull; ${countdownStr}
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono font-normal">Expires: <span class="text-slate-200 font-bold">${expTimeStr}</span></span>
+            </div>
+          `;
+        } else {
+          statusHtml = `
+            <div class="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-400 text-xs font-medium whitespace-nowrap inline-flex flex-col gap-0.5">
+              <span class="font-mono">Expired</span>
+              <span class="text-[10px] text-slate-500 font-mono font-normal">Ended: ${expTimeStr}</span>
+            </div>
+          `;
+        }
+
+        if (idx === 0) {
+          const orgEl = document.getElementById('zczc-decoded-org');
+          const eventEl = document.getElementById('zczc-decoded-event');
+          const fipsEl = document.getElementById('zczc-decoded-fips');
+          const timeEl = document.getElementById('zczc-decoded-time');
+          const rawWindow = document.getElementById('zczc-raw-display');
+
+          if (orgEl) orgEl.textContent = `${entry.originator} (${stName})`;
+          if (eventEl) eventEl.textContent = `${entry.code} (${entry.eventName})`;
+          if (fipsEl) fipsEl.textContent = entry.fips;
+          if (timeEl) timeEl.textContent = remainingSec > 0 ? `${expTimeStr} (${Math.floor(remainingSec/60)}m ${remainingSec%60}s)` : `Expired (${expTimeStr})`;
+          if (rawWindow) {
+            const cleanFips = (entry.fips || '').replace(/[^0-9]/g, '');
+            const validFips = cleanFips.length >= 6 ? cleanFips.substring(0, 6) : (stName.includes('WJON') ? '051059' : '036061');
+            const cleanOrg = (entry.originator || 'EAS').replace(/[^A-Z0-9]/gi, '');
+            const sampleHeader = `ZCZC-${cleanOrg}-${entry.code}-${validFips}+0045-${new Date(entry.timeMs).getUTCDay()}${String(new Date(entry.timeMs).getUTCHours()).padStart(2, '0')}${String(new Date(entry.timeMs).getUTCMinutes()).padStart(2, '0')}-${stName}/EAS-`;
+            rawWindow.innerHTML = `<span class="text-white font-bold">${sampleHeader}</span>`;
+          }
+        }
+
+        const row = document.createElement('div'); 
+        row.className = 'log-row bg-slate-900 border border-slate-700/80 rounded-xl p-3 hover:bg-slate-800 cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm'; 
+        row.title = 'Click to focus radar on warning polygon';
+        row.innerHTML = `
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold font-mono whitespace-nowrap ${cc.badge}">${entry.code}</span>
+              <span class="text-sm font-bold text-white truncate">${entry.eventName}</span>
+            </div>
+            <div class="text-xs text-slate-400 truncate flex items-center gap-1.5 font-mono flex-wrap">
+              <span class="font-bold text-slate-300">${entry.originator}</span> &bull; 
+              ${entry.fips}
+            </div>
+          </div>
+          <div class="flex items-center sm:flex-col sm:items-end justify-between gap-2 flex-shrink-0">
+            ${statusHtml}
+            <span class="text-[10px] text-slate-500 font-mono">${timeStr}</span>
+          </div>
+        `; 
+        row.addEventListener('click', () => {
+          focusAlertOnMap(entry, row);
+        });
+        logTableBody.appendChild(row); 
+      }); 
+
+      if (logCount) logCount.textContent = alertEntries.length + ' transmissions logged'; 
+      if (!hasActiveAlert && alertActive) {
+        setNormalState();
+        updateRadarAlertPolygons();
+      }
+    }
+
+    renderLog();
+    setInterval(renderLog, 1000); // 1-second countdown clock update
+    setInterval(updateRadarAlertPolygons, 10000); // Refresh radar polygon layers every 10s
+
+    // Comprehensive 50-State + Territories FIPS Prefix Mapping
+    const STATE_FIPS_MAP = {
+      '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT', '10': 'DE',
+      '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL', '18': 'IN', '19': 'IA',
+      '20': 'KS', '21': 'KY', '22': 'LA', '23': 'ME', '24': 'MD', '25': 'MA', '26': 'MI', '27': 'MN',
+      '28': 'MS', '29': 'MO', '30': 'MT', '31': 'NE', '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM',
+      '36': 'NY', '37': 'NC', '38': 'ND', '39': 'OH', '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI',
+      '45': 'SC', '46': 'SD', '47': 'TN', '48': 'TX', '49': 'UT', '50': 'VT', '51': 'VA', '53': 'WA',
+      '54': 'WV', '55': 'WI', '56': 'WY', '72': 'PR', '78': 'VI', '66': 'GU', '60': 'AS', '69': 'MP'
+    };
+
+    const STATE_NAMES_MAP = {
+      'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California', 'CO': 'Colorado',
+      'CT': 'Connecticut', 'DE': 'Delaware', 'DC': 'District of Columbia', 'FL': 'Florida', 'GA': 'Georgia',
+      'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa', 'KS': 'Kansas',
+      'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan',
+      'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada',
+      'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina',
+      'ND': 'North Dakota', 'OH': 'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island',
+      'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+      'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming', 'PR': 'Puerto Rico'
+    };
+
+    // Major County & Metro FIPS Database
+    const NOTABLE_COUNTY_MAP = {
+      '036061': 'New York (Manhattan), NY',
+      '036047': 'Kings (Brooklyn), NY',
+      '036081': 'Queens, NY',
+      '036005': 'Bronx, NY',
+      '036085': 'Richmond (Staten Island), NY',
+      '036119': 'Westchester, NY',
+      '036059': 'Nassau, NY',
+      '036103': 'Suffolk, NY',
+      '036087': 'Rockland, NY',
+      '036071': 'Orange, NY',
+      '036079': 'Putnam, NY',
+      '036027': 'Dutchess, NY',
+      '034003': 'Bergen, NJ',
+      '034017': 'Hudson, NJ',
+      '034013': 'Essex, NJ',
+      '034031': 'Passaic, NJ',
+      '034023': 'Middlesex, NJ',
+      '034039': 'Union, NJ',
+      '034025': 'Monmouth, NJ',
+      '034029': 'Ocean, NJ',
+      '034021': 'Mercer, NJ',
+      '034037': 'Sussex, NJ',
+      '034027': 'Morris, NJ',
+      '034035': 'Somerset, NJ',
+      '034019': 'Hunterdon, NJ',
+      '009001': 'Fairfield, CT',
+      '009009': 'New Haven, CT',
+      '051059': 'Fairfax, VA',
+      '051013': 'Arlington, VA',
+      '051510': 'Alexandria, VA',
+      '051107': 'Loudoun, VA',
+      '051153': 'Prince William, VA',
+      '011001': 'District of Columbia (DC)',
+      '024031': 'Montgomery, MD',
+      '024033': "Prince George's, MD",
+      '024510': 'Baltimore City, MD',
+      '006037': 'Los Angeles, CA',
+      '006073': 'San Diego, CA',
+      '006059': 'Orange, CA',
+      '006075': 'San Francisco, CA',
+      '017031': 'Cook (Chicago), IL',
+      '048201': 'Harris (Houston), TX',
+      '048113': 'Dallas, TX',
+      '048453': 'Travis (Austin), TX',
+      '048439': 'Tarrant (Fort Worth), TX',
+      '012086': 'Miami-Dade, FL',
+      '012011': 'Broward, FL',
+      '012095': 'Orange (Orlando), FL',
+      '012057': 'Hillsborough (Tampa), FL',
+      '042101': 'Philadelphia, PA',
+      '042003': 'Allegheny (Pittsburgh), PA',
+      '026163': 'Wayne (Detroit), MI',
+      '013121': 'Fulton (Atlanta), GA',
+      '013089': 'DeKalb, GA',
+      '013067': 'Cobb, GA',
+      '013135': 'Gwinnett, GA',
+      '053033': 'King (Seattle), WA',
+      '004013': 'Maricopa (Phoenix), AZ',
+      '032003': 'Clark (Las Vegas), NV',
+      '008031': 'Denver, CO',
+      '027053': 'Hennepin (Minneapolis), MN',
+      '029510': 'St. Louis City, MO',
+      '029189': 'St. Louis County, MO',
+      '037119': 'Mecklenburg (Charlotte), NC',
+      '037183': 'Wake (Raleigh), NC',
+      '039049': 'Franklin (Columbus), OH',
+      '039035': 'Cuyahoga (Cleveland), OH',
+      '039061': 'Hamilton (Cincinnati), OH',
+      '047157': 'Shelby (Memphis), TN',
+      '047037': 'Davidson (Nashville), TN',
+      '018097': 'Marion (Indianapolis), IN',
+      '055079': 'Milwaukee, WI',
+      '022071': 'Orleans (New Orleans), LA',
+      '025025': 'Suffolk (Boston), MA'
+    };
+
+    const SAME_SUBDIVISIONS = {
+      '0': '', '1': 'Northwest ', '2': 'Northern ',
+      '3': 'Northeast ',     '4': 'Western ',   '5': 'Central ',
+      '6': 'Eastern ',       '7': 'Southwest ', '8': 'Southern ',
+      '9': 'Southeast '
+    };
+
+    // Decode 6-digit SAME/FIPS token (PSSCCC): digits 2-3 = State FIPS, digits 4-6 = County FIPS
+    function decodeFipsLocation(fipsStr) {
+      if (!fipsStr) return 'National / All Areas';
+      const clean = String(fipsStr).replace(/[^0-9]/g, '');
+      if (clean.length < 5) return fipsStr;
+      const sixDigit = clean.padStart(6, '0').slice(-6);
+
+      // National / All Areas
+      if (sixDigit === '000000') return 'National / All Areas';
+
+      const pDigit = sixDigit.charAt(0);
+      const subPrefix = SAME_SUBDIVISIONS[pDigit] || '';
+
+      // 1. Check exact 6-digit major county dictionary
+      if (NOTABLE_COUNTY_MAP[sixDigit]) return subPrefix + NOTABLE_COUNTY_MAP[sixDigit];
+
+      // 2. Also try 5-digit key (digits 2-6, dropping the partition digit P)
+      const fiveDigit = sixDigit.substring(1);
+      if (NOTABLE_COUNTY_MAP[fiveDigit]) return subPrefix + NOTABLE_COUNTY_MAP[fiveDigit];
+
+      // 3. Parse State (digits 2-3) and County (digits 4-6)
+      const stFips = sixDigit.substring(1, 3);
+      const countyFips = sixDigit.substring(3, 6);
+      const stateAbbr = STATE_FIPS_MAP[stFips];
+
+      if (stateAbbr) {
+        if (countyFips === '000') {
+          return `${subPrefix}All of ${STATE_NAMES_MAP[stateAbbr] || stateAbbr}`;
+        }
+        return `${subPrefix}County ${countyFips}, ${stateAbbr}`;
+      }
+
+      return `FIPS ${sixDigit}`;
+    }
+
+    // Centroid Coordinates for US County FIPS & State Regions [lng, lat]
+    const FIPS_COORDINATES = {
+      '036061': [-73.9712, 40.7831], // New York (Manhattan)
+      '036047': [-73.9442, 40.6782], // Kings (Brooklyn)
+      '036081': [-73.7949, 40.7282], // Queens
+      '036005': [-73.8648, 40.8448], // Bronx
+      '036085': [-74.1502, 40.5795], // Staten Island
+      '036119': [-73.8055, 41.1220], // Westchester
+      '036059': [-73.5895, 40.7423], // Nassau
+      '036103': [-72.9691, 40.8832], // Suffolk
+      '034003': [-74.0780, 40.9621], // Bergen, NJ
+      '034017': [-74.0776, 40.7453], // Hudson, NJ
+      '034013': [-74.2494, 40.7891], // Essex, NJ
+      '034031': [-74.2982, 41.0326], // Passaic, NJ
+      '034023': [-74.4057, 40.4363], // Middlesex, NJ
+      '034039': [-74.3118, 40.6583], // Union, NJ
+      '051059': [-77.3064, 38.8462], // Fairfax, VA
+      '051013': [-77.1068, 38.8799], // Arlington, VA
+      '051510': [-77.0469, 38.8048], // Alexandria, VA
+      '051107': [-77.6410, 39.0911], // Loudoun, VA
+      '051153': [-77.4764, 38.7107], // Prince William, VA
+      '011001': [-77.0369, 38.9072], // DC
+      '024031': [-77.2036, 39.1363], // Montgomery, MD
+      '024033': [-76.8488, 38.8315], // Prince George's, MD
+      '006037': [-118.2437, 34.0522], // Los Angeles, CA
+      '006073': [-117.1611, 32.7157], // San Diego, CA
+      '006059': [-117.8265, 33.7175], // Orange, CA
+      '006075': [-122.4194, 37.7749], // San Francisco, CA
+      '017031': [-87.6298, 41.8781], // Chicago (Cook), IL
+      '048201': [-95.3698, 29.7604], // Houston (Harris), TX
+      '048113': [-96.7970, 32.7767], // Dallas, TX
+      '048453': [-97.7431, 30.2672], // Austin (Travis), TX
+      '012086': [-80.1918, 25.7617], // Miami-Dade, FL
+      '012011': [-80.1495, 26.1224], // Broward, FL
+      '012095': [-81.3792, 28.5383], // Orlando (Orange), FL
+      '042101': [-75.1652, 39.9526], // Philadelphia, PA
+      '042003': [-79.9959, 40.4406], // Pittsburgh, PA
+      '026163': [-83.0458, 42.3314], // Detroit (Wayne), MI
+      '013121': [-84.3880, 33.7490], // Atlanta (Fulton), GA
+      '053033': [-122.3321, 47.6062], // Seattle (King), WA
+      '004013': [-112.0740, 33.4484], // Phoenix (Maricopa), AZ
+      '032003': [-115.1398, 36.1699], // Las Vegas (Clark), NV
+      '008031': [-104.9903, 39.7392], // Denver, CO
+      '027053': [-93.2650, 44.9778], // Minneapolis (Hennepin), MN
+      '029510': [-90.1994, 38.6270], // St. Louis, MO
+      '037119': [-80.8431, 35.2271], // Charlotte (Mecklenburg), NC
+      '039049': [-82.9988, 39.9612], // Columbus (Franklin), OH
+      '047157': [-90.0490, 35.1495], // Memphis (Shelby), TN
+      '047037': [-86.7816, 36.1627], // Nashville (Davidson), TN
+      '018097': [-86.1581, 39.7684], // Indianapolis (Marion), IN
+      '055079': [-87.9065, 43.0389], // Milwaukee, WI
+      '025025': [-71.0589, 42.3601]  // Boston (Suffolk), MA
+    };
+
+    // Approximate state centroid fallbacks
+    const STATE_CENTROIDS = {
+      'AL': [-86.9023, 32.8067], 'AK': [-152.4044, 61.3707], 'AZ': [-111.4312, 33.7298], 'AR': [-92.3731, 34.9697],
+      'CA': [-119.6816, 36.1162], 'CO': [-105.7821, 39.0598], 'CT': [-72.7554, 41.5978], 'DE': [-75.5071, 39.3185],
+      'DC': [-77.0369, 38.9072], 'FL': [-81.5158, 27.7663], 'GA': [-83.6431, 33.0406], 'HI': [-157.4983, 21.0943],
+      'ID': [-114.4788, 44.2405], 'IL': [-89.3985, 40.3495], 'IN': [-86.1349, 39.8494], 'IA': [-93.2105, 42.0115],
+      'KS': [-96.7265, 38.5266], 'KY': [-84.6701, 37.6681], 'LA': [-91.8678, 31.1695], 'ME': [-69.3819, 44.6939],
+      'MD': [-76.8021, 39.0639], 'MA': [-71.5301, 42.2302], 'MI': [-84.5361, 43.3266], 'MN': [-93.9002, 45.6945],
+      'MS': [-89.6787, 32.7416], 'MO': [-92.2884, 38.4561], 'MT': [-110.4544, 46.9219], 'NE': [-98.2681, 41.1254],
+      'NV': [-117.0554, 38.8026], 'NH': [-71.5639, 43.4525], 'NJ': [-74.5210, 40.2989], 'NM': [-106.2485, 34.8405],
+      'NY': [-74.9481, 42.1657], 'NC': [-79.8064, 35.6301], 'ND': [-99.7840, 47.5289], 'OH': [-82.7649, 40.3888],
+      'OK': [-96.9289, 35.5653], 'OR': [-122.0709, 44.5720], 'PA': [-77.2098, 40.5908], 'RI': [-71.5118, 41.6809],
+      'SC': [-80.9450, 33.8569], 'SD': [-99.9018, 44.2998], 'TN': [-86.6923, 35.7478], 'TX': [-97.5635, 31.0545],
+      'UT': [-111.8624, 40.1500], 'VT': [-72.7107, 44.0459], 'VA': [-78.1699, 37.7693], 'WA': [-120.7401, 47.4009],
+      'WV': [-80.9545, 38.4912], 'WI': [-89.6165, 44.2685], 'WY': [-107.2903, 42.7560], 'PR': [-66.5901, 18.2208]
+    };
+
+    function getFipsCentroid(fipsCodeOrDesc) {
+      if (!fipsCodeOrDesc) return [-74.0060, 40.7128];
+      const str = String(fipsCodeOrDesc).toUpperCase();
+      const clean = str.replace(/[^0-9]/g, '');
+      if (clean.length >= 5) {
+        const sixDigit = clean.padStart(6, '0').slice(-6);
+        if (FIPS_COORDINATES[sixDigit]) return FIPS_COORDINATES[sixDigit];
+        
+        const stFips = sixDigit.substring(1, 3);
+        const stateAbbr = STATE_FIPS_MAP[stFips];
+        if (stateAbbr && STATE_CENTROIDS[stateAbbr]) return STATE_CENTROIDS[stateAbbr];
+      }
+
+      // Check if location string has state abbreviation (e.g. "TX", "FL", "CA", "PA", "NC", etc.)
+      for (const [abbr, coords] of Object.entries(STATE_CENTROIDS)) {
+        if (str.includes(`, ${abbr}`) || str.includes(` ${abbr} `) || str.endsWith(` ${abbr}`) || str.includes(`(${abbr})`)) {
+          return coords;
+        }
+      }
+
+      // Check notable city / county keyword matches
+      if (str.includes('NEW YORK') || str.includes('MANHATTAN') || str.includes('NYC')) return FIPS_COORDINATES['036061'];
+      if (str.includes('BROOKLYN')) return FIPS_COORDINATES['036047'];
+      if (str.includes('QUEENS')) return FIPS_COORDINATES['036081'];
+      if (str.includes('CHICAGO')) return FIPS_COORDINATES['017031'];
+      if (str.includes('HOUSTON')) return FIPS_COORDINATES['048201'];
+      if (str.includes('DALLAS')) return FIPS_COORDINATES['048113'];
+      if (str.includes('LOS ANGELES')) return FIPS_COORDINATES['006037'];
+      if (str.includes('MIAMI')) return FIPS_COORDINATES['012086'];
+      if (str.includes('SEATTLE')) return FIPS_COORDINATES['053033'];
+      if (str.includes('ATLANTA')) return FIPS_COORDINATES['013121'];
+      if (str.includes('PHILADELPHIA')) return FIPS_COORDINATES['042101'];
+      if (str.includes('PITTSBURGH')) return FIPS_COORDINATES['042003'];
+
+      return [-74.0060, 40.7128]; // Default to ERN Relay Hub (NYC)
+    }
+
+    // In-memory zone geometry cache (zoneUrl -> GeoJSON geometry)
+    const zoneGeoCache = new Map();
+
+    async function fetchZoneGeometry(zoneUrl) {
+      if (!zoneUrl) return null;
+      if (zoneGeoCache.has(zoneUrl)) return zoneGeoCache.get(zoneUrl);
+      try {
+        const res = await fetch(zoneUrl, {
+          headers: { 
+            'Accept': 'application/geo+json',
+            'User-Agent': '(listentovtwfip.org, ops@listentovtwfip.org)'
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.geometry && data.geometry.coordinates) {
+            zoneGeoCache.set(zoneUrl, data.geometry);
+            return data.geometry;
+          }
+        }
+      } catch(e) {}
+      return null;
+    }
+
+    async function fetchNwsAlertPolygon(alertObj) {
+      if (alertObj.geometry && alertObj.geometry.coordinates) return alertObj.geometry;
+      try {
+        // Prefer fipsList (raw numeric codes) over parsing digits from human-readable fips string
+        let fips6 = '';
+        if (alertObj.fipsList && alertObj.fipsList.length > 0) {
+          fips6 = alertObj.fipsList[0].padStart(6, '0');
+        } else {
+          const cleanFips = (alertObj.fips || '').replace(/[^0-9]/g, '');
+          fips6 = cleanFips.length >= 6 ? cleanFips.substring(0, 6) : '';
+        }
+        if (!fips6) return null;
+        
+        // 1. Check active NWS alerts matching SAME/FIPS
+        const res = await fetch(`https://api.weather.gov/alerts/active`, {
+          headers: { 
+            'Accept': 'application/geo+json',
+            'User-Agent': '(listentovtwfip.org, ops@listentovtwfip.org)'
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.features && data.features.length > 0) {
+            for (const f of data.features) {
+              const geocode = (f.properties && f.properties.geocode && f.properties.geocode.SAME) || [];
+              if (geocode.includes(fips6) || geocode.includes(fips6.substring(1))) {
+                // Update real event name if available from NWS
+                if (f.properties && f.properties.event) {
+                  alertObj.eventName = f.properties.event;
+                }
+
+                // If exact storm polygon exists, use it
+                if (f.geometry && f.geometry.coordinates) {
+                  alertObj.geometry = f.geometry;
+                  return f.geometry;
+                }
+
+                // If geometry is null (e.g. Winter Storm, Red Flag, Wind, Watches):
+                // Fetch up to 10 affectedZones geometries
+                const affectedZones = (f.properties && f.properties.affectedZones) || [];
+                if (affectedZones.length > 0) {
+                  const zoneGeoms = [];
+                  const zonesToFetch = affectedZones.slice(0, 10);
+                  for (const zUrl of zonesToFetch) {
+                    const zGeom = await fetchZoneGeometry(zUrl);
+                    if (zGeom && zGeom.coordinates) {
+                      zoneGeoms.push(zGeom);
+                    }
+                  }
+
+                  if (zoneGeoms.length === 1) {
+                    alertObj.geometry = zoneGeoms[0];
+                    return zoneGeoms[0];
+                  } else if (zoneGeoms.length > 1) {
+                    // Combine into a MultiPolygon
+                    const multiCoords = [];
+                    zoneGeoms.forEach(zg => {
+                      if (zg.type === 'Polygon') {
+                        multiCoords.push(zg.coordinates);
+                      } else if (zg.type === 'MultiPolygon') {
+                        zg.coordinates.forEach(c => multiCoords.push(c));
+                      }
+                    });
+                    if (multiCoords.length > 0) {
+                      const combinedGeom = { type: 'MultiPolygon', coordinates: multiCoords };
+                      alertObj.geometry = combinedGeom;
+                      return combinedGeom;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // 2. Exact county boundary fallback from NWS zones API for decoded state/county
+        const stFips = fips6.substring(1, 3);
+        const stateAbbr = STATE_FIPS_MAP[stFips];
+        const countyCode = fips6.substring(3);
+        if (stateAbbr && countyCode) {
+          const zoneUrl = `https://api.weather.gov/zones/county/${stateAbbr}C${countyCode}`;
+          const zGeom = await fetchZoneGeometry(zoneUrl);
+          if (zGeom && zGeom.coordinates) {
+            alertObj.geometry = zGeom;
+            return zGeom;
+          }
+        }
+      } catch(e) {}
+      return null;
+    }
+
+    function computeGeoJsonBounds(coordinates) {
+      let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+      function scan(arr) {
+        if (typeof arr[0] === 'number' && typeof arr[1] === 'number') {
+          const lng = arr[0], lat = arr[1];
+          if (lng < minLng) minLng = lng;
+          if (lng > maxLng) maxLng = lng;
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+        } else if (Array.isArray(arr)) {
+          arr.forEach(scan);
+        }
+      }
+      scan(coordinates);
+      if (minLng !== Infinity && maxLng !== -Infinity) {
+        return [[minLng, minLat], [maxLng, maxLat]];
+      }
+      return null;
+    }
+
+    async function focusAlertOnMap(entry, rowElement) {
+      // 1. Highlight selected row
+      document.querySelectorAll('.log-row').forEach(r => r.classList.remove('bg-slate-700/60', 'ring-1', 'ring-ern-amber/50'));
+      if (rowElement) {
+        rowElement.classList.add('bg-slate-700/60', 'ring-1', 'ring-ern-amber/50');
+      }
+
+      if (!window.radarMapInstance) return;
+      const map = window.radarMapInstance;
+
+      // 2. Fetch / resolve exact NWS polygon geometry
+      let geom = (entry.geometry && entry.geometry.coordinates) ? entry.geometry : await fetchNwsAlertPolygon(entry);
+      let bounds = geom ? computeGeoJsonBounds(geom.coordinates) : null;
+      const centroid = getFipsCentroid(entry.fips);
+
+      // 3. Update layer polygons
+      await updateRadarAlertPolygons(centroid, bounds);
+
+      // 4. Camera movement has been completely removed to prevent radar hijacking.
+
+      // 5. Show rich interactive popup directly over target county with true event title
+      const popupCoords = centroid || (bounds ? [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2] : null);
+      if (popupCoords) {
+        const expEpochForPopup = entry.expiresAtEpoch || entry.expiresAt || entry.expiresMs;
+        const expTimeStr = expEpochForPopup ? new Date(expEpochForPopup).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
+        const displayTitle = entry.eventName || (eventCodes[entry.code] && eventCodes[entry.code].name) || `${entry.code} Alert`;
+        
+        new mapboxgl.Popup({ offset: 12 })
+          .setLngLat(popupCoords)
+          .setHTML(`
+            <div class="p-2 text-xs font-sans min-w-[210px]">
+              <div class="font-bold text-red-600 uppercase flex items-center gap-1.5 border-b border-slate-200 pb-1 mb-1.5">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                ${entry.code} &mdash; ${displayTitle}
+              </div>
+              <div class="text-slate-800 font-medium"><b>📍 Location:</b> ${entry.fips}</div>
+              <div class="text-slate-700 text-[11px] mt-0.5"><b>🏢 Office:</b> ${entry.originator} (${entry.station})</div>
+              <div class="text-slate-600 text-[11px] mt-0.5"><b>⏱️ Expiration:</b> ${expTimeStr}</div>
+            </div>
+          `)
+          .addTo(map);
+      }
+
+      document.getElementById('radar')?.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function updateRadarAlertPolygons(targetCentroid, targetBounds) {
+      if (!window.radarMapInstance) return;
+      const map = window.radarMapInstance;
+      const source = map.getSource('eas-alert-polygons');
+      if (!source) return;
+
+      const activeAlerts = alertEntries.filter(a => a && (a.expiresMs > Date.now()));
+      const features = [];
+
+      for (const a of activeAlerts) {
+        let hexColor = '#ef4444'; // Red default (TOR)
+        if (a.code === 'TOR') hexColor = '#ef4444';      // Tornado Warning Solid Red
+        else if (a.code === 'SVR') hexColor = '#f59e0b'; // Severe Thunderstorm Solid Amber/Orange
+        else if (a.code === 'FFW') hexColor = '#10b981'; // Flash Flood Solid Green
+        else if (a.code === 'SMW') hexColor = '#06b6d4'; // Special Marine Solid Cyan
+        else if (a.code === 'SVA' || a.code === 'TOA' || a.code === 'FFA') hexColor = '#eab308'; // Watch Amber
+        else if (a.code === 'EVI' || a.code === 'CIV' || a.code === 'CEM') hexColor = '#dc2626';
+        else if (a.code === 'RWT' || a.code === 'RMT') hexColor = '#3b82f6';
+        else if (a.color === 'amber') hexColor = '#f59e0b';
+        else if (a.color === 'green') hexColor = '#10b981';
+
+        const isPartial = a.fipsList && a.fipsList.some(f => String(f).replace(/[^0-9]/g, '').padStart(6, '0').charAt(0) !== '0');
+
+        // 1. If alert already has NWS storm polygon geometry, use it (always solid line)
+        if (a.geometry && a.geometry.coordinates) {
+          features.push({
+            type: 'Feature',
+            geometry: a.geometry,
+            properties: {
+              code: a.code,
+              eventName: a.eventName,
+              originator: a.originator,
+              station: a.station,
+              location: a.fips || 'NWS Warning Polygon',
+              headline: a.eventName,
+              expiresStr: new Date(a.expiresMs).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+              color: hexColor,
+              isPartial: false
+            }
+          });
+          continue;
+        }
+
+        // 2. Fetch live NWS warning/zone geometry by FIPS
+        const liveGeo = await fetchNwsAlertPolygon(a);
+        if (liveGeo && liveGeo.coordinates) {
+          features.push({
+            type: 'Feature',
+            geometry: liveGeo,
+            properties: {
+              code: a.code,
+              eventName: a.eventName,
+              originator: a.originator,
+              station: a.station,
+              location: a.fips || 'NWS Warning Polygon',
+              headline: a.eventName,
+              expiresStr: new Date(a.expiresMs).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+              color: hexColor,
+              isPartial: isPartial
+            }
+          });
+        }
+      }
+
+      source.setData({
+        type: 'FeatureCollection',
+        features: features
+      });
+
+      // Camera auto-pan has been disabled per user request to prevent radar takeover.
+      // (map.fitBounds and map.flyTo removed)
+    }
+
+    async function fetchIembotRadarPolygons() {
+      if (!window.radarMapInstance) return;
+      const map = window.radarMapInstance;
+      const source = map.getSource('iembot-alert-polygons');
+      if (!source) return;
+
+      try {
+        const res = await fetch('https://mesonet.agron.iastate.edu/geojson/sbw.geojson', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        // Filter for OKX and PHI active warnings
+        const targetWfos = ['OKX', 'PHI'];
+        
+        const filteredFeatures = data.features.filter(f => {
+          return f.properties && targetWfos.includes(f.properties.wfo);
+        }).map(f => {
+          let hexColor = '#3b82f6';
+          const p = f.properties.phenomena;
+          if (p === 'TO') hexColor = '#ef4444';      // Tornado
+          else if (p === 'SV') hexColor = '#f59e0b'; // Severe Thunderstorm
+          else if (p === 'FF') hexColor = '#10b981'; // Flash Flood
+          else if (p === 'MA') hexColor = '#06b6d4'; // Marine
+          else if (p === 'EW') hexColor = '#dc2626'; // Extreme Wind
+          
+          f.properties.color = hexColor;
+          return f;
+        });
+
+        source.setData({
+          type: 'FeatureCollection',
+          features: filteredFeatures
+        });
+      } catch (err) {
+        console.error("IEMBot Polygon fetch error:", err);
+      }
+    }
+
+    // ===== RESILIENT ZCZC PROTOCOL DECODER =====
+    // Parses official & test SAME/EAS headers: ZCZC-ORG-EEE-PSSCCC-PSSCCC+TTTT-JJJHHMM-STATION-
+    function parseZczcHeader(rawStr, defaultStation) {
+      if (!rawStr || !rawStr.includes('ZCZC-')) return null;
+      try {
+        const startIdx = rawStr.indexOf('ZCZC-');
+        const header = rawStr.substring(startIdx);
+        
+        // Flexible SAME Header Regex:
+        // - Originator: 3 to 6 letters (e.g. WXR, EAS, PEP, CIV, EASNWS)
+        // - Event: 3 letters/digits (e.g. TOR, SVR, FFW, RWT, DMO, TEST)
+        // - First FIPS: 5 to 6 digits
+        const sameRegex = /^ZCZC-(?<org>[A-Z]{3,6})-(?<event>[A-Z0-9]{3,4})-(?<firstFips>\d{5,6})/i;
+        const match = header.match(sameRegex);
+        
+        if (!match) {
+          console.warn('[EAS Parser] Header failed strict regex, discarding:', rawStr);
+          return null;
+        }
+
+        const parts = header.split('-');
+        const org = match.groups.org.toUpperCase();
+        const code = match.groups.event.toUpperCase();
+          
+          // 3. Fix Originator / Event Shift
+          const originators = ['WXR', 'EAS', 'PEP', 'CIV', 'EASNWS'];
+          if (originators.includes(code) || !/^[A-Z0-9]{3}$/.test(code)) {
+            throw new Error(`Invalid event code or originator shift detected: ${code}`);
+          }
+          
+          // Collect all county FIPS blocks
+          const fipsCodes = [];
+          if (match && match.groups.firstFips) {
+            fipsCodes.push(match.groups.firstFips.padStart(6, '0'));
+          }
+
+          let stationCall = defaultStation || 'WJON-IP';
+          
+          // Extract station callsign from end of header (supports hyphens and slashes like 'WJON-IP/EAS' or 'ERN-VTWF')
+          const stationCandidateMatch = header.match(/-\d{5,7}-([A-Za-z0-9\/\-_]+)-?/);
+          if (stationCandidateMatch && stationCandidateMatch[1]) {
+            stationCall = stationCandidateMatch[1].trim();
+          }
+
+          for (let i = 3; i < parts.length; i++) {
+            const seg = parts[i].trim();
+            if (seg.includes('+')) {
+              const [lastFips] = seg.split('+');
+              const cleanLast = (lastFips || '').replace(/[^0-9]/g, '');
+              if (cleanLast.length >= 5 && !fipsCodes.includes(cleanLast.padStart(6, '0'))) {
+                fipsCodes.push(cleanLast.padStart(6, '0'));
+              }
+              break;
+            } else if (/^\d{5,6}$/.test(seg)) {
+              const pFips = seg.padStart(6, '0');
+              if (!fipsCodes.includes(pFips)) fipsCodes.push(pFips);
+            }
+          }
+
+          // Exact Immutable Expiration Epoch Calculation
+          let expiresAtEpoch = null;
+          // Round fallback issueTime to current minute :00 (never raw Date.now() with arbitrary seconds)
+          let issueTimeMs = Math.floor(Date.now() / 60000) * 60000;
+          let durationMin = 45;
+
+          // Flexible duration (+TTTT) and Julian timestamp (5 to 7 digits)
+          const timeMatch = header.match(/\+(\d{2})(\d{2})-(\d{1,3})(\d{2})(\d{2})-/);
+          if (timeMatch) {
+            const durHours = parseInt(timeMatch[1], 10) || 0;
+            const durMins = parseInt(timeMatch[2], 10) || 0;
+            const durMs = (durHours * 60 + durMins) * 60 * 1000;
+            durationMin = (durHours * 60) + durMins;
+
+            const jjj = parseInt(timeMatch[3], 10);
+            const utcH = parseInt(timeMatch[4], 10);
+            const utcM = parseInt(timeMatch[5], 10);
+
+            if (jjj >= 1 && jjj <= 366 && utcH >= 0 && utcH <= 23 && utcM >= 0 && utcM <= 59) {
+              const now = new Date();
+              const year = now.getUTCFullYear();
+              // Strict UTC issue timestamp with 00 seconds and 00 milliseconds
+              const issueDate = new Date(Date.UTC(year, 0, 1, utcH, utcM, 0, 0));
+              issueDate.setUTCDate(jjj);
+
+              // Year rollover safeguard
+              if (Math.abs(Date.now() - issueDate.getTime()) > 300 * 86400000) {
+                const prevYear = new Date(Date.UTC(year - 1, 0, 1, utcH, utcM, 0, 0));
+                prevYear.setUTCDate(jjj);
+                issueTimeMs = prevYear.getTime();
+              } else {
+                issueTimeMs = issueDate.getTime();
+              }
+
+              // Exact expiration epoch (aligned to exact minute :00)
+              expiresAtEpoch = issueTimeMs + (durHours * 3600000 + durMins * 60000);
+            }
+          }
+
+          // Strict fallback: if header lacks timestamp, align to current minute :00 without arbitrary receive seconds
+          const roundedNowMs = Math.floor(Date.now() / 60000) * 60000;
+          const finalExpiresAt = expiresAtEpoch || (roundedNowMs + (durationMin * 60 * 1000));
+
+          let station = stationCall;
+          if (station.includes('JON') || station.includes('WJON')) station = 'WJON-IP';
+          else if (station.includes('VTWF') || station.includes('ERN')) station = 'ERN-VTWF';
+
+          // Format human-readable county locations — never "United States"
+          let formattedFips;
+          if (fipsCodes.length > 0) {
+            formattedFips = decodeFipsLocation(fipsCodes[0]);
+            if (fipsCodes.length > 1) {
+              formattedFips = `${formattedFips} +${fipsCodes.length - 1} counties`;
+            }
+          } else {
+            // Last resort: try to extract any 5-6 digit sequence from the raw header
+            const rawFipsMatch = header.match(/\b(\d{5,6})\b/);
+            if (rawFipsMatch) {
+              formattedFips = decodeFipsLocation(rawFipsMatch[1]);
+            } else {
+              formattedFips = 'Unknown Area (FIPS Missing)';
+            }
+          }
+
+          const eventInfo = eventCodes[code] || { name: `${code} Emergency Message`, color: 'red', durationMin: durationMin || 45 };
+
+          return {
+            rawHeader: header,
+            station,
+            code,
+            org,
+            fips: formattedFips,
+            fipsList: fipsCodes,
+            eventName: eventInfo.name,
+            durationMin: durationMin || eventInfo.durationMin,
+            issueTimeMs: issueTimeMs,
+            expiresAtEpoch: finalExpiresAt,
+            expiresAt: finalExpiresAt,
+            expiresMs: finalExpiresAt
+          };
+      } catch(e) {
+        console.warn('[EAS Parser] Header failed strict regex:', rawStr, e);
+      }
+      return null;
+    }
+
+    // ===== COM PORT LISTENER (HARDWARE ENDEC / SERIAL FEED) =====
+    document.getElementById('connect-com')?.addEventListener('click', async () => {
+      if (!('serial' in navigator)) { alert('Web Serial API is not supported in this browser. Please use Chrome or Edge.'); return; }
+      try {
+        const port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 9600 });
+        document.getElementById('connect-com').innerHTML = '<span class="text-ern-green font-bold">●</span> COM Port Connected';
+        document.getElementById('connect-com').classList.remove('text-slate-400', 'hover:text-white');
+        document.getElementById('connect-com').classList.add('text-emerald-400', 'pointer-events-none');
+        
+        const decoder = new TextDecoderStream();
+        const inputDone = port.readable.pipeTo(decoder.writable);
+        const inputStream = decoder.readable;
+        const reader = inputStream.getReader();
+        
+        let buffer = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (value) {
+            buffer += value;
+            let lines = buffer.split('\n');
+            buffer = lines.pop(); 
+            for (let line of lines) {
+              line = line.trim();
+              const parsed = parseZczcHeader(line);
+              if (parsed) {
+                addDecodedAlert(parsed.code, parsed.org, parsed.fips, parsed.eventName, parsed.expiresAtEpoch, parsed.station);
+              }
+            }
+          }
+          if (done) {
+            reader.releaseLock();
+            break;
+          }
+        }
+      } catch (err) {
+        console.error('Serial connection failed:', err);
+      }
+    });
+
+    // ===== LIVE ANNOUNCEMENTS BADGE SYNC =====
+    async function checkAnnouncementsBadge() {
+      const badge = document.getElementById('announcement-nav-badge');
+      if (!badge) return;
+      try {
+        const res = await fetch('/api/announcements', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const hasEmergency = data.some(a => a.priority === 'EMERGENCY');
+          const hasWarning = data.some(a => a.priority === 'WARNING');
+          badge.textContent = data.length > 1 ? `${data.length}` : '!';
+          badge.className = 'px-1.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full text-white shadow-sm animate-pulse ' + 
+            (hasEmergency ? 'bg-red-600 shadow-red-500/50' : (hasWarning ? 'bg-amber-600 shadow-amber-500/50' : 'bg-blue-600 shadow-blue-500/50'));
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      } catch(e) {}
+    }
+    checkAnnouncementsBadge();
+    setInterval(checkAnnouncementsBadge, 5000);
+
+    // ===== SYNCHRONIZED 6-SECOND THUNDERSTORM CANVAS & AUDIO =====
+    const overlay = document.createElement('div');
+    overlay.id = 'storm-overlay';
+    overlay.innerHTML = '<canvas id="rain-canvas"></canvas><div class="lightning-flash" id="flash-div"></div>';
+    document.body.appendChild(overlay);
+
+    const rainCanvas = document.getElementById('rain-canvas');
+    const fDiv = document.getElementById('flash-div');
+    let ctx2D = null;
+    let rainDrops = [];
+    let rainAnimId = null;
+
+    function resizeRainCanvas() {
+      if (!rainCanvas) return;
+      rainCanvas.width = window.innerWidth;
+      rainCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeRainCanvas);
+    resizeRainCanvas();
+
+    function initRain() {
+      rainDrops = [];
+      const numDrops = Math.floor((window.innerWidth * window.innerHeight) / 1000);
+      for (let i = 0; i < numDrops; i++) {
+        rainDrops.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          l: Math.random() * 30 + 15,
+          v: Math.random() * 20 + 24,
+          o: Math.random() * 0.4 + 0.3
+        });
+      }
+    }
+
+    function drawRain() {
+      if (!rainCanvas) return;
+      if (!ctx2D) ctx2D = rainCanvas.getContext('2d');
+      ctx2D.clearRect(0, 0, rainCanvas.width, rainCanvas.height);
+      ctx2D.strokeStyle = 'rgba(186, 230, 253, 0.7)';
+      ctx2D.lineWidth = 1.5;
+      ctx2D.beginPath();
+      for (let i = 0; i < rainDrops.length; i++) {
+        const d = rainDrops[i];
+        ctx2D.moveTo(d.x, d.y);
+        ctx2D.lineTo(d.x - 3, d.y + d.l);
+        d.y += d.v;
+        d.x -= 3;
+        if (d.y > rainCanvas.height) {
+          d.y = -d.l;
+          d.x = Math.random() * (rainCanvas.width + 100);
+        }
+      }
+      ctx2D.stroke();
+      rainAnimId = requestAnimationFrame(drawRain);
+    }
+
+    function triggerStormVisuals(remainingTime = 5000) {
+      resizeRainCanvas();
+      initRain();
+      overlay.classList.add('active');
+      if (fDiv) {
+        fDiv.classList.remove('strike-1');
+        void fDiv.offsetWidth;
+        fDiv.classList.add('strike-1');
+      }
+      if (rainAnimId) cancelAnimationFrame(rainAnimId);
+      drawRain();
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+          if (rainAnimId) cancelAnimationFrame(rainAnimId);
+        }, 500);
+      }, remainingTime);
+    }
+
+    let globalAudioCtx = null;
+    function playThunderstormAudio(startOffset = 0) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!globalAudioCtx || globalAudioCtx.state === 'closed') {
+          globalAudioCtx = new AudioContext();
+        }
+        const ctx = globalAudioCtx;
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const duration = 5.0; // 2s before switch + 3s after switch
+        const remaining = Math.max(0.5, duration - startOffset);
+
+        // 1. Rain Layer
+        const rainBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const rainBuffer = ctx.createBuffer(2, rainBufferSize, ctx.sampleRate);
+        const rL = rainBuffer.getChannelData(0);
+        const rR = rainBuffer.getChannelData(1);
+        for (let i = 0; i < rainBufferSize; i++) {
+          rL[i] = (Math.random() * 2 - 1) * 0.2;
+          rR[i] = (Math.random() * 2 - 1) * 0.2;
+        }
+        const rainSource = ctx.createBufferSource();
+        rainSource.buffer = rainBuffer;
+        const rainFilter = ctx.createBiquadFilter();
+        rainFilter.type = 'bandpass';
+        rainFilter.frequency.setValueAtTime(1600, ctx.currentTime);
+        rainFilter.Q.setValueAtTime(0.6, ctx.currentTime);
+
+        const rainGain = ctx.createGain();
+        rainGain.gain.setValueAtTime(0.01, ctx.currentTime);
+        rainGain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.15);
+        rainGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining);
+
+        rainSource.connect(rainFilter);
+        rainFilter.connect(rainGain);
+        rainGain.connect(ctx.destination);
+        rainSource.start();
+        rainSource.stop(ctx.currentTime + remaining);
+
+        // 2. Thunderclap & Rolling Rumble Layer
+        const thunderBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const thunderBuffer = ctx.createBuffer(2, thunderBufferSize, ctx.sampleRate);
+        const tL = thunderBuffer.getChannelData(0);
+        const tR = thunderBuffer.getChannelData(1);
+        let l0 = 0, l1 = 0, l2 = 0;
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < thunderBufferSize; i++) {
+          const wL = Math.random() * 2 - 1;
+          const wR = Math.random() * 2 - 1;
+          l0 = 0.994 * l0 + wL * 0.05;
+          l1 = 0.96 * l1 + wL * 0.1;
+          l2 = 0.86 * l2 + wL * 0.25;
+          tL[i] = (l0 + l1 + l2) * 0.55;
+
+          b0 = 0.994 * b0 + wR * 0.05;
+          b1 = 0.96 * b1 + wR * 0.1;
+          b2 = 0.86 * b2 + wR * 0.25;
+          tR[i] = (b0 + b1 + b2) * 0.55;
+        }
+
+        const thunderSource = ctx.createBufferSource();
+        thunderSource.buffer = thunderBuffer;
+
+        const thunderFilter = ctx.createBiquadFilter();
+        thunderFilter.type = 'lowpass';
+        thunderFilter.frequency.setValueAtTime(Math.max(40, 360 - startOffset * 40), ctx.currentTime);
+        thunderFilter.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + remaining);
+
+        const thunderGain = ctx.createGain();
+        if (startOffset <= 0.1) {
+          thunderGain.gain.setValueAtTime(0.01, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.95, ctx.currentTime + 0.05); // Strike
+          thunderGain.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 0.25);
+          thunderGain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 0.55); // Loud clap
+          thunderGain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 1.2);
+          thunderGain.gain.linearRampToValueAtTime(0.65, ctx.currentTime + 1.9); // Secondary rumble at switch
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 3.5);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        } else {
+          thunderGain.gain.setValueAtTime(0.65, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.3);
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 1.8);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        }
+
+        thunderSource.connect(thunderFilter);
+        thunderFilter.connect(thunderGain);
+        thunderGain.connect(ctx.destination);
+        thunderSource.start();
+        thunderSource.stop(ctx.currentTime + remaining);
+      } catch(e) {}
+    }
+
+    // 2s / 3s ratio: 2000ms storm before navigation redirect, 3000ms storm remaining on incoming page
+    document.querySelectorAll('a[href]').forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && !href.startsWith('http') && !href.startsWith('#') && !link.hasAttribute('target')) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          sessionStorage.setItem('ern_storm_start', Date.now());
+          triggerStormVisuals(5000);
+          playThunderstormAudio(0);
+          setTimeout(() => {
+            window.location.href = href;
+          }, 2000);
+        });
+      }
+    });
+
+    (function checkStormResume() {
+      const start = sessionStorage.getItem('ern_storm_start');
+      if (start) {
+        const elapsed = (Date.now() - parseInt(start, 10)) / 1000;
+        sessionStorage.removeItem('ern_storm_start');
+        if (elapsed < 4.8) {
+          const remainingMs = Math.max(500, Math.floor((5.0 - elapsed) * 1000));
+          triggerStormVisuals(remainingMs);
+          playThunderstormAudio(elapsed);
+        }
+      }
+    })();
+
+    // ===== LIVE DOPPLER RADAR (MAPBOX + OPENWEATHERMAP) =====
+    (function initRadarMap() {
+      const MAPBOX_TOKEN = ['pk', 'eyJ1IjoidGhlZ3Jpbm5lcnd4IiwiYSI6ImNtOHJya3E4ZTA5ajkybHB3NTJzeGp0c3cifQ', 'pY7gpDgk4Ma9L_LddwjgDg'].join('.');
+      const OWM_API_KEY = '8bcd9678a11c455ba9223b2328f999f6';
+      const NYC_COORDS = [-74.0060, 40.7128]; // [lng, lat]
+      
+      const mapContainer = document.getElementById('radar-map');
+      if (!mapContainer || typeof mapboxgl === 'undefined') return;
+
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+      const map = new mapboxgl.Map({
+        container: 'radar-map',
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: NYC_COORDS,
+        zoom: 7.2,
+        attributionControl: false
+      });
+      window.radarMapInstance = map;
+
+      map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+
+      // ERN Broadcast Hub Marker
+      const markerEl = document.createElement('div');
+      markerEl.className = 'w-4 h-4 rounded-full bg-red-500 border-2 border-white shadow-lg pulse-red cursor-pointer';
+      markerEl.title = 'ERN-VTWF Master Transmitter / Relay Hub';
+      new mapboxgl.Marker(markerEl)
+        .setLngLat(NYC_COORDS)
+        .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML('<div class="text-xs p-1 text-slate-900 font-bold">📡 ERN-VTWF Primary Relay<br/><span class="font-normal text-[10px] text-slate-600">New York City, NY</span></div>'))
+        .addTo(map);
+
+      let currentLayer = 'nexrad'; // Default to official NOAA NEXRAD N0Q
+
+      function getTileUrl(layer) {
+        const cacheBuster = `_t=${Date.now()}`;
+        if (layer === 'nexrad') {
+          return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png?${cacheBuster}`;
+        }
+        return `https://tile.openweathermap.org/map/${layer}/{z}/{x}/{y}.png?appid=${OWM_API_KEY}&${cacheBuster}`;
+      }
+
+      function reloadRadarTiles() {
+        if (map && map.getSource('radar-tiles')) {
+          if (map.getLayer('radar-layer')) map.removeLayer('radar-layer');
+          map.removeSource('radar-tiles');
+
+          map.addSource('radar-tiles', {
+            type: 'raster',
+            tiles: [getTileUrl(currentLayer)],
+            tileSize: 256
+          });
+
+          map.addLayer({
+            id: 'radar-layer',
+            type: 'raster',
+            source: 'radar-tiles',
+            paint: {
+              'raster-opacity': currentLayer === 'clouds_new' ? 0.65 : 0.85,
+              'raster-fade-duration': 150
+            }
+          });
+        }
+      }
+
+      // ===== RADAR AUTO-REFRESH EVERY 2 MINUTES (120s) =====
+      const REFRESH_INTERVAL_SEC = 120; // 2 minutes
+      let secondsLeft = REFRESH_INTERVAL_SEC;
+      const radarTimerEl = document.getElementById('radar-timer');
+
+      setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft <= 0) {
+          secondsLeft = REFRESH_INTERVAL_SEC;
+          reloadRadarTiles();
+        }
+        if (radarTimerEl) {
+          const m = Math.floor(secondsLeft / 60);
+          const s = secondsLeft % 60;
+          radarTimerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+      }, 1000);
+
+      let ncdcMarkers = [];
+      let ncdcVisible = false;
+
+      map.on('load', () => {
+        // Add Radar Tile Source
+        map.addSource('radar-tiles', {
+          type: 'raster',
+          tiles: [getTileUrl(currentLayer)],
+          tileSize: 256
+        });
+
+        map.addLayer({
+          id: 'radar-layer',
+          type: 'raster',
+          source: 'radar-tiles',
+          paint: {
+            'raster-opacity': 0.85,
+            'raster-fade-duration': 150
+          }
+        });
+
+        // ===== LOCAL AREA MONITORED COUNTIES (Red: Primary, Blue: Regional Relay) =====
+        // Red (Primary Monitored): Manhattan, Brooklyn, Queens, Bronx, Staten Island, Nassau, Suffolk, Westchester, Bergen, Hudson, Essex, Union, Passaic, Middlesex, Monmouth, Rockland
+        // Blue (Regional Relay): Fairfield, New Haven, Orange, Putnam, Dutchess, Sussex, Morris, Somerset, Hunterdon, Ocean, Mercer
+        const PRIMARY_MONITORED_FIPS = [
+          '036061', '036047', '036081', '036005', '036085', '036059', '036103', '036119', '036087',
+          '034003', '034017', '034013', '034039', '034031', '034023', '034025'
+        ];
+        const REGIONAL_MONITORED_FIPS = [
+          '009001', '009009', '036071', '036079', '036027', '034037', '034027', '034035', '034019', '034029', '034021'
+        ];
+
+        map.addSource('monitored-counties', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+
+        map.addLayer({
+          id: 'monitored-counties-fill',
+          type: 'fill',
+          source: 'monitored-counties',
+          paint: {
+            'fill-color': ['get', 'color'],
+            'fill-opacity': 0.28
+          }
+        });
+
+        map.addLayer({
+          id: 'monitored-counties-outline',
+          type: 'line',
+          source: 'monitored-counties',
+          paint: {
+            'line-color': ['get', 'borderColor'],
+            'line-width': 1.8,
+            'line-opacity': 0.85
+          }
+        });
+
+        // Click popup on monitored county
+        map.on('click', 'monitored-counties-fill', (e) => {
+          if (e.features && e.features[0]) {
+            const props = e.features[0].properties;
+            new mapboxgl.Popup({ offset: 10 })
+              .setLngLat(e.lngLat)
+              .setHTML(`
+                <div class="p-2 text-xs font-sans">
+                  <div class="font-bold uppercase flex items-center gap-1" style="color: ${props.borderColor}">
+                    <span class="w-2 h-2 rounded-full" style="background-color: ${props.borderColor}"></span>
+                    ${props.name} (${props.fips})
+                  </div>
+                  <div class="text-slate-800 font-medium mt-1"><b>Status:</b> ${props.status}</div>
+                  <div class="text-[10px] text-slate-500 mt-0.5">Coverage: ${props.tier} • ERN-VTWF Network</div>
+                </div>
+              `)
+              .addTo(map);
+          }
+        });
+
+        async function loadMonitoredCountiesGeoJson() {
+          const features = [];
+          const allFips = [...PRIMARY_MONITORED_FIPS.map(f => ({ fips: f, type: 'primary' })), ...REGIONAL_MONITORED_FIPS.map(f => ({ fips: f, type: 'regional' }))];
+          
+          for (const item of allFips) {
+            const fips = item.fips;
+            const stFips = fips.substring(1, 3);
+            const stateAbbr = STATE_FIPS_MAP[stFips];
+            const countyCode = fips.substring(3);
+            if (!stateAbbr || !countyCode) continue;
+
+            try {
+              const res = await fetch(`https://api.weather.gov/zones/county/${stateAbbr}C${countyCode}`, {
+                headers: { 'Accept': 'application/geo+json' }
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (data.geometry && data.geometry.coordinates) {
+                  const isPrimary = item.type === 'primary';
+                  features.push({
+                    type: 'Feature',
+                    geometry: data.geometry,
+                    properties: {
+                      fips: fips,
+                      name: (data.properties && data.properties.name) || NOTABLE_COUNTY_MAP[fips] || fips,
+                      status: isPrimary ? 'Active Monitoring' : 'Regional Relay Backup',
+                      tier: isPrimary ? 'Primary Local Coverage' : 'Extended Regional Coverage',
+                      color: isPrimary ? '#dc2626' : '#2563eb', // Red for Monitoring, Blue for Regional
+                      borderColor: isPrimary ? '#ef4444' : '#3b82f6'
+                    }
+                  });
+                }
+              }
+            } catch(e) {}
+          }
+
+          if (features.length > 0 && map.getSource('monitored-counties')) {
+            map.getSource('monitored-counties').setData({
+              type: 'FeatureCollection',
+              features: features
+            });
+          }
+        }
+
+        loadMonitoredCountiesGeoJson();
+
+        // Initialize EAS Alert Polygon Source & Layers on Map (renders above station rings)
+        map.addSource('eas-alert-polygons', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+
+        map.addLayer({
+          id: 'eas-polygons-fill',
+          type: 'fill',
+          source: 'eas-alert-polygons',
+          paint: {
+            'fill-color': ['get', 'color'],
+            'fill-opacity': 0.35
+          }
+        });
+
+        map.addLayer({
+          id: 'eas-polygons-outline',
+          type: 'line',
+          source: 'eas-alert-polygons',
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': 2.2,
+            'line-dasharray': [
+              'case',
+              ['==', ['get', 'isPartial'], true],
+              ['literal', [4, 4]], // Dashed for subdivisions
+              ['literal', [1]] // Solid for full county/storm
+            ]
+          }
+        });
+
+        // Initialize IEMBot SBW Polygon Source & Layers
+        map.addSource('iembot-alert-polygons', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+
+        map.addLayer({
+          id: 'iembot-polygons-fill',
+          type: 'fill',
+          source: 'iembot-alert-polygons',
+          paint: {
+            'fill-color': ['get', 'color'],
+            'fill-opacity': 0.35
+          }
+        });
+
+        map.addLayer({
+          id: 'iembot-polygons-outline',
+          type: 'line',
+          source: 'iembot-alert-polygons',
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': 2.5
+          }
+        });
+
+        // Click popup on EAS polygon
+        map.on('click', 'eas-polygons-fill', (e) => {
+          if (e.features && e.features[0]) {
+            const props = e.features[0].properties;
+            new mapboxgl.Popup({ offset: 10 })
+              .setLngLat(e.lngLat)
+              .setHTML(`
+                <div class="p-2 text-xs font-sans min-w-[200px]">
+                  <div class="font-bold text-red-600 uppercase flex items-center gap-1.5 border-b border-slate-200 pb-1 mb-1.5">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    ${props.code} &mdash; ${props.eventName}
+                  </div>
+                  <div class="text-slate-800 font-medium"><b>📍 Area:</b> ${props.location}</div>
+                  <div class="text-slate-700 text-[11px] mt-0.5"><b>🏢 Office:</b> ${props.originator} (${props.station})</div>
+                  <div class="text-slate-600 text-[11px] mt-0.5"><b>⏱️ Expires:</b> ${props.expiresStr || 'Active Warning'}</div>
+                </div>
+              `)
+              .addTo(map);
+          }
+        });
+
+        // Click popup on IEMBot polygon
+        map.on('click', 'iembot-polygons-fill', (e) => {
+          if (e.features && e.features[0]) {
+            const props = e.features[0].properties;
+            new mapboxgl.Popup({ offset: 10 })
+              .setLngLat(e.lngLat)
+              .setHTML(`
+                <div class="p-2 text-xs font-sans min-w-[200px]">
+                  <div class="font-bold text-red-600 uppercase flex items-center gap-1.5 border-b border-slate-200 pb-1 mb-1.5">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    ${props.phenomena} &mdash; NWS Warning
+                  </div>
+                  <div class="text-slate-800 font-medium"><b>📍 WFO:</b> ${props.wfo}</div>
+                  <div class="text-slate-700 text-[11px] mt-0.5"><b>⚠️ Event ID:</b> ${props.eventid}</div>
+                  <div class="text-slate-600 text-[11px] mt-0.5"><b>⏱️ Expires:</b> ${new Date(props.expire).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</div>
+                </div>
+              `)
+              .addTo(map);
+          }
+        });
+
+        // Update polygon overlay with any active alerts
+        updateRadarAlertPolygons();
+        fetchIembotRadarPolygons();
+        setInterval(fetchIembotRadarPolygons, 60000); // 1-minute refresh for live polygons
+
+        // Load NOAA NCDC NEXRAD Tower Sites
+        loadNcdcRadarSites();
+      });
+
+      async function loadNcdcRadarSites() {
+        try {
+          const res = await fetch('https://gis.ncdc.noaa.gov/arcgis/rest/services/cdo/nexrad/MapServer/0/query?where=1%3D1&outFields=STATION_ID,STATION_NAME,STATE,LATITUDE,LONGITUDE&f=geojson');
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!data.features) return;
+
+          data.features.forEach(f => {
+            const coords = f.geometry.coordinates;
+            const props = f.properties;
+            const el = document.createElement('div');
+            el.className = 'w-3 h-3 rounded-full bg-amber-400 border border-slate-950 shadow-md cursor-pointer hover:scale-150 transition-transform';
+            el.style.display = 'none'; // Initially hidden until toggled
+            
+            const marker = new mapboxgl.Marker(el)
+              .setLngLat(coords)
+              .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(`
+                <div class="text-xs p-1 text-slate-900 font-bold">
+                  📡 ${props.STATION_NAME || ''} (${props.STATION_ID || ''})
+                  <div class="text-[10px] text-slate-600 font-normal">State: ${props.STATE || 'N/A'} • NOAA NCDC NEXRAD Tower</div>
+                </div>
+              `))
+              .addTo(map);
+
+            ncdcMarkers.push(marker);
+          });
+        } catch(e) {}
+      }
+
+      function switchRadarLayer(newLayer, activeBtnId) {
+        currentLayer = newLayer;
+        ['radar-layer-nexrad', 'radar-layer-precip', 'radar-layer-clouds', 'radar-layer-wind'].forEach(id => {
+          const btn = document.getElementById(id);
+          if (btn) {
+            if (id === activeBtnId) {
+              btn.className = id === 'radar-layer-nexrad' 
+                ? 'px-2.5 py-1 rounded-md font-bold text-white bg-red-600 transition flex items-center gap-1'
+                : 'px-2.5 py-1 rounded-md font-medium text-white bg-blue-600 transition';
+            } else {
+              btn.className = 'px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition';
+            }
+          }
+        });
+
+        if (map.getSource('radar-tiles')) {
+          if (map.getLayer('radar-layer')) map.removeLayer('radar-layer');
+          map.removeSource('radar-tiles');
+
+          map.addSource('radar-tiles', {
+            type: 'raster',
+            tiles: [getTileUrl(newLayer)],
+            tileSize: 256
+          });
+
+          map.addLayer({
+            id: 'radar-layer',
+            type: 'raster',
+            source: 'radar-tiles',
+            paint: {
+              'raster-opacity': newLayer === 'clouds_new' ? 0.65 : 0.85,
+              'raster-fade-duration': 150
+            }
+          });
+        }
+      }
+
+      document.getElementById('radar-layer-nexrad')?.addEventListener('click', () => switchRadarLayer('nexrad', 'radar-layer-nexrad'));
+      document.getElementById('radar-layer-precip')?.addEventListener('click', () => switchRadarLayer('precipitation_new', 'radar-layer-precip'));
+      document.getElementById('radar-layer-clouds')?.addEventListener('click', () => switchRadarLayer('clouds_new', 'radar-layer-clouds'));
+      document.getElementById('radar-layer-wind')?.addEventListener('click', () => switchRadarLayer('wind_new', 'radar-layer-wind'));
+
+      document.getElementById('toggle-nexrad-sites')?.addEventListener('click', () => {
+        ncdcVisible = !ncdcVisible;
+        const btn = document.getElementById('toggle-nexrad-sites');
+        if (btn) {
+          btn.className = ncdcVisible 
+            ? 'px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/50 text-xs text-amber-300 font-mono flex items-center gap-1 transition'
+            : 'px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-amber-300/70 font-mono flex items-center gap-1 transition';
+        }
+        ncdcMarkers.forEach(m => {
+          m.getElement().style.display = ncdcVisible ? 'block' : 'none';
+        });
+      });
+
+      document.getElementById('recenter-radar')?.addEventListener('click', () => {
+        map.flyTo({ center: NYC_COORDS, zoom: 7.2, essential: true });
+      });
+    })();
+
+    // ===== LIVE NYC METEOROLOGICAL TELEMETRY & 7-DAY FORECAST =====
+    function getWmoWeatherIcon(code) {
+      if (code === 0) return { icon: '☀️', text: 'Clear' };
+      if (code === 1 || code === 2) return { icon: '🌤️', text: 'Partly Cloudy' };
+      if (code === 3) return { icon: '☁️', text: 'Overcast' };
+      if (code === 45 || code === 48) return { icon: '🌫️', text: 'Fog' };
+      if (code >= 51 && code <= 55) return { icon: '🌦️', text: 'Drizzle' };
+      if (code >= 61 && code <= 65) return { icon: '🌧️', text: 'Rain' };
+      if (code >= 71 && code <= 77) return { icon: '🌨️', text: 'Snow' };
+      if (code >= 80 && code <= 82) return { icon: '🌧️', text: 'Showers' };
+      if (code >= 95 && code <= 99) return { icon: '⛈️', text: 'Thunderstorm' };
+      return { icon: '⛅', text: 'Cloudy' };
+    }
+
+    async function fetchNycWeatherTelemetry() {
+      const OWM_API_KEY = '8bcd9678a11c455ba9223b2328f999f6';
+      const s = getUserSettings();
+      try {
+        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=40.7128&lon=-74.0060&units=imperial&appid=${OWM_API_KEY}`);
+        if (!res.ok) return;
+        const d = await res.json();
+        
+        const tempEl = document.getElementById('wx-temp');
+        const feelsEl = document.getElementById('wx-feels');
+        const condEl = document.getElementById('wx-condition');
+        const humEl = document.getElementById('wx-humidity');
+        const windEl = document.getElementById('wx-wind');
+        const windDirEl = document.getElementById('wx-wind-dir');
+        const pressEl = document.getElementById('wx-pressure');
+        const timeEl = document.getElementById('wx-updated-time');
+
+        // Temp Conversion (°F vs °C)
+        let rawTemp = d.main.temp;
+        let rawFeels = d.main.feels_like;
+        let tempUnitLabel = '°F';
+        if (s.tempUnit === 'C') {
+          rawTemp = (rawTemp - 32) * (5 / 9);
+          rawFeels = (rawFeels - 32) * (5 / 9);
+          tempUnitLabel = '°C';
+        }
+
+        // Wind Conversion (mph vs km/h vs knots)
+        let rawWind = d.wind.speed;
+        let rawGust = d.wind.gust;
+        let windUnitLabel = 'mph';
+        if (s.windUnit === 'kmh') {
+          rawWind = rawWind * 1.60934;
+          if (rawGust) rawGust = rawGust * 1.60934;
+          windUnitLabel = 'km/h';
+        } else if (s.windUnit === 'knots') {
+          rawWind = rawWind * 0.868976;
+          if (rawGust) rawGust = rawGust * 0.868976;
+          windUnitLabel = 'kts';
+        }
+
+        // Pressure Conversion (inHg vs hPa)
+        let pressStr = `${(d.main.pressure * 0.02953).toFixed(2)} inHg`;
+        if (s.pressureUnit === 'hPa') {
+          pressStr = `${d.main.pressure} hPa`;
+        }
+
+        if (tempEl) tempEl.textContent = `${Math.round(rawTemp)}${tempUnitLabel}`;
+        if (feelsEl) feelsEl.textContent = `Feels like ${Math.round(rawFeels)}${tempUnitLabel}`;
+        const condName = d.weather && d.weather[0] ? d.weather[0].main : 'Clear';
+        if (condEl) condEl.textContent = condName;
+        const twcIconEl = document.getElementById('wx-twc-icon');
+        if (twcIconEl && typeof getTwcAnimatedIcon === 'function') {
+          const isNight = d.weather && d.weather[0] && d.weather[0].icon ? d.weather[0].icon.endsWith('n') : false;
+          twcIconEl.src = getTwcAnimatedIcon(condName, isNight);
+        }
+        if (humEl) humEl.textContent = `Humidity ${d.main.humidity}%`;
+        if (windEl) windEl.textContent = `${Math.round(rawWind)} ${windUnitLabel}`;
+        if (windDirEl) windDirEl.textContent = `Gusts: ${rawGust ? Math.round(rawGust) + ' ' + windUnitLabel : 'Calm'}`;
+        if (pressEl) pressEl.textContent = pressStr;
+        if (timeEl) timeEl.textContent = `Live NYC • ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      } catch(e) {}
+    }
+
+    function getNwsWeatherIcon(shortForecast) {
+      const f = (shortForecast || '').toLowerCase();
+      if (f.includes('thunder') || f.includes('tstorm')) return { icon: '⛈️', text: shortForecast };
+      if (f.includes('snow') || f.includes('flurr') || f.includes('blizzard')) return { icon: '🌨️', text: shortForecast };
+      if (f.includes('rain') || f.includes('shower')) return { icon: '🌧️', text: shortForecast };
+      if (f.includes('drizzle')) return { icon: '🌦️', text: shortForecast };
+      if (f.includes('fog') || f.includes('haze')) return { icon: '🌫️', text: shortForecast };
+      if (f.includes('partly sunny') || f.includes('partly cloudy')) return { icon: '🌤️', text: shortForecast };
+      if (f.includes('mostly cloudy') || f.includes('overcast') || f.includes('cloudy')) return { icon: '☁️', text: shortForecast };
+      if (f.includes('sunny') || f.includes('clear')) return { icon: '☀️', text: shortForecast };
+      return { icon: '⛅', text: shortForecast || 'Clear' };
+    }
+
+    async function fetch7DayForecast() {
+      const container = document.getElementById('forecast-7day-container');
+      if (!container) return;
+      const s = getUserSettings();
+      try {
+        let periods = null;
+
+        // 1. Try official NWS OKX (33,42) through Worker Proxy
+        try {
+          const nwsRes = await fetch('/api/nws-forecast');
+          if (nwsRes.ok) {
+            const nwsData = await nwsRes.json();
+            if (nwsData.properties && Array.isArray(nwsData.properties.periods)) {
+              periods = nwsData.properties.periods;
+            }
+          }
+        } catch(e) {}
+
+        // 2. Direct fallback to NOAA NWS API
+        if (!periods) {
+          try {
+            const directNws = await fetch('https://api.weather.gov/gridpoints/OKX/33,42/forecast', {
+              headers: { 'Accept': 'application/geo+json' }
+            });
+            if (directNws.ok) {
+              const directData = await directNws.json();
+              if (directData.properties && Array.isArray(directData.properties.periods)) {
+                periods = directData.properties.periods;
+              }
+            }
+          } catch(e) {}
+        }
+
+        if (periods && periods.length >= 2) {
+          // Populate the official NWS narrative discussion from the current and tomorrow's periods
+          const bulletinTitle = document.getElementById('nws-bulletin-title');
+          const bulletinWind = document.getElementById('nws-bulletin-wind');
+          const bulletinText = document.getElementById('nws-bulletin-text');
+          if (bulletinText && periods[0]) {
+            const firstPeriod = periods[0];
+            const secondPeriod = periods[1];
+            // Find tomorrow's daytime and tomorrow night's period
+            const tomorrowPeriod = periods.find(p => p.number > 1 && p.isDaytime);
+            const tomorrowNightPeriod = periods.find(p => p.number > 1 && !p.isDaytime && (!tomorrowPeriod || p.number > tomorrowPeriod.number));
+
+            if (bulletinTitle) bulletinTitle.textContent = `Official NWS Narrative (${firstPeriod.name} & Tomorrow)`;
+            if (bulletinWind) bulletinWind.textContent = `Wind: ${firstPeriod.windSpeed} ${firstPeriod.windDirection} • NWS Upton, NY`;
+
+            let narrativeHtml = `
+              <div class="space-y-2">
+                <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800">
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30 uppercase mb-1">
+                    ${firstPeriod.name}
+                  </span>
+                  <p class="text-slate-200 text-xs leading-relaxed">${firstPeriod.detailedForecast}</p>
+                </div>
+                ${secondPeriod && secondPeriod !== tomorrowPeriod ? `
+                  <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80">
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-700/50 text-slate-300 border border-slate-600/50 uppercase mb-1">
+                      ${secondPeriod.name}
+                    </span>
+                    <p class="text-slate-300 text-xs leading-relaxed">${secondPeriod.detailedForecast}</p>
+                  </div>
+                ` : ''}
+                ${tomorrowPeriod ? `
+                  <div class="p-2.5 rounded-lg bg-slate-900/90 border border-cyan-500/30 bg-cyan-950/20">
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 uppercase mb-1">
+                      TOMORROW &bull; ${tomorrowPeriod.name}
+                    </span>
+                    <p class="text-slate-200 text-xs leading-relaxed font-medium">${tomorrowPeriod.detailedForecast}</p>
+                    ${tomorrowNightPeriod ? `
+                      <div class="mt-2 pt-2 border-t border-slate-800/60">
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 uppercase mb-1">
+                          ${tomorrowNightPeriod.name}
+                        </span>
+                        <p class="text-slate-300 text-xs leading-relaxed">${tomorrowNightPeriod.detailedForecast}</p>
+                      </div>
+                    ` : ''}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+            bulletinText.innerHTML = narrativeHtml;
+          }
+
+          // Group by day (Daytime vs Nighttime)
+          const daysMap = [];
+          for (let i = 0; i < periods.length; i++) {
+            const p = periods[i];
+            const isNight = !p.isDaytime;
+            if (!isNight || daysMap.length === 0) {
+              daysMap.push({
+                name: p.name,
+                startTime: p.startTime,
+                high: p.temperature,
+                low: null,
+                shortForecast: p.shortForecast,
+                iconUrl: p.icon,
+                wind: `${p.windSpeed} ${p.windDirection}`,
+                precipChance: p.probabilityOfPrecipitation?.value || 0
+              });
+            } else {
+              const last = daysMap[daysMap.length - 1];
+              if (last && last.low === null) {
+                last.low = p.temperature;
+                if (!last.precipChance && p.probabilityOfPrecipitation?.value) {
+                  last.precipChance = p.probabilityOfPrecipitation.value;
+                }
+              }
+            }
+            if (daysMap.length >= 7) break;
+          }
+
+          let html = '';
+          daysMap.slice(0, 7).forEach((d, idx) => {
+            const dateObj = new Date(d.startTime);
+            const dayLabel = idx === 0 ? 'Today' : (idx === 1 ? 'Tomorrow' : d.name.replace(/ Night$/, ''));
+            const dateSub = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+            const twcIcon = typeof getTwcAnimatedIcon === 'function' ? getTwcAnimatedIcon(d.shortForecast, false) : '/assets/twc-icons/sunny.gif';
+
+            let highTemp = d.high;
+            let lowTemp = d.low !== null ? d.low : Math.round(d.high - 12);
+            let unitSym = '°';
+            if (s.tempUnit === 'C') {
+              highTemp = Math.round((highTemp - 32) * (5 / 9));
+              lowTemp = Math.round((lowTemp - 32) * (5 / 9));
+            }
+
+            html += `
+              <div class="p-2.5 rounded-xl ${idx === 0 ? 'bg-slate-800 border-ern-border/80 ring-1 ring-blue-500/30' : 'bg-slate-900/60 border-slate-700/50'} border text-center hover:bg-slate-800/80 transition shadow-sm flex flex-col justify-between">
+                <div>
+                  <div class="text-[11px] font-bold ${idx === 0 ? 'text-blue-400' : 'text-slate-300'} font-mono uppercase truncate">${dayLabel}</div>
+                  <div class="text-[9px] text-slate-500 font-mono">${dateSub}</div>
+                  <div class="my-1.5 flex items-center justify-center">
+                    <img src="${twcIcon}" alt="${d.shortForecast}" class="w-8 h-8 twc-pixel-icon object-contain filter drop-shadow" onerror="this.src='/assets/twc-icons/unknown.gif'" />
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-medium truncate mb-1" title="${d.shortForecast}">${d.shortForecast}</div>
+                  <div class="text-xs font-bold text-white">${highTemp}${unitSym} <span class="text-slate-400 font-normal text-[10px]">${lowTemp}${unitSym}</span></div>
+                </div>
+                <div class="mt-1 pt-1 border-t border-slate-800/60 space-y-0.5">
+                  <div class="text-[9px] text-slate-400 font-mono truncate" title="Wind: ${d.wind || 'Calm'}">💨 ${d.wind || 'Calm'}</div>
+                  ${d.precipChance > 10 ? `<div class="text-[10px] font-mono font-bold text-cyan-400 flex items-center justify-center gap-0.5"><svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-8a1 1 0 112 0v3a1 1 0 11-2 0V10z"/></svg>${d.precipChance}%</div>` : '<div class="text-[10px] text-slate-600 font-mono">0% precip</div>'}
+                </div>
+              </div>
+            `;
+          });
+          container.innerHTML = html;
+          return;
+        }
+
+        // Secondary fallback to Open-Meteo if NWS servers are unavailable
+        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=40.7128&longitude=-74.0060&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,windspeed_10m_max&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=America%2FNew_York');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.daily || !data.daily.time) return;
+
+        const days = data.daily.time;
+        const maxTemps = data.daily.temperature_2m_max;
+        const minTemps = data.daily.temperature_2m_min;
+        const codes = data.daily.weathercode;
+        const precipProb = data.daily.precipitation_probability_max;
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        let html = '';
+        for (let i = 0; i < Math.min(7, days.length); i++) {
+          const dateObj = new Date(days[i] + 'T00:00:00');
+          const dayLabel = i === 0 ? 'Today' : (i === 1 ? 'Tomorrow' : dayNames[dateObj.getDay()]);
+          const dateSub = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+          const wmo = getWmoWeatherIcon(codes[i]);
+          const twcIcon = typeof getTwcAnimatedIcon === 'function' ? getTwcAnimatedIcon(wmo.text, false) : '/assets/twc-icons/sunny.gif';
+          const pop = precipProb ? precipProb[i] : 0;
+
+          let displayMax = maxTemps[i];
+          let displayMin = minTemps[i];
+          let unitSym = '°';
+          if (s.tempUnit === 'C') {
+            displayMax = (displayMax - 32) * (5 / 9);
+            displayMin = (displayMin - 32) * (5 / 9);
+          }
+
+          html += `
+            <div class="p-2.5 rounded-xl ${i === 0 ? 'bg-slate-800 border-ern-border/80 ring-1 ring-blue-500/30' : 'bg-slate-900/60 border-slate-700/50'} border text-center hover:bg-slate-800/80 transition shadow-sm">
+              <div class="text-[11px] font-bold ${i === 0 ? 'text-blue-400' : 'text-slate-300'} font-mono uppercase">${dayLabel}</div>
+              <div class="text-[9px] text-slate-500 font-mono">${dateSub}</div>
+              <div class="my-1.5 flex items-center justify-center">
+                <img src="${twcIcon}" alt="${wmo.text}" class="w-8 h-8 twc-pixel-icon object-contain filter drop-shadow" onerror="this.src='/assets/twc-icons/unknown.gif'" />
+              </div>
+              <div class="text-[10px] text-slate-400 font-medium truncate mb-1">${wmo.text}</div>
+              <div class="text-xs font-bold text-white">${Math.round(displayMax)}${unitSym} <span class="text-slate-400 font-normal text-[10px]">${Math.round(displayMin)}${unitSym}</span></div>
+              ${pop > 15 ? `<div class="text-[10px] font-mono font-bold text-cyan-400 mt-1 flex items-center justify-center gap-0.5"><svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-8a1 1 0 112 0v3a1 1 0 11-2 0V10z"/></svg>${pop}%</div>` : '<div class="text-[10px] text-slate-600 font-mono mt-1">--</div>'}
+            </div>
+          `;
+        }
+        container.innerHTML = html;
+      } catch(err) {
+        console.error("Forecast fetch error:", err);
+      }
+    }
+
+    fetchNycWeatherTelemetry();
+    setInterval(fetchNycWeatherTelemetry, 60000); // 1-minute telemetry refresh
+
+    fetch7DayForecast();
+    setInterval(fetch7DayForecast, 300000); // 5-minute automatic forecast refresh
+  </script>
+</body>
+</html>

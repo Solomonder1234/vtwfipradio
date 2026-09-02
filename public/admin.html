@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Console — ERN / VTWF</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    html { background-color: #0f172a; }
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes pulse-red { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
+    .pulse-red { animation: pulse-red 1.5s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .blink { animation: blink 1s step-start infinite; }
+    html { background-color: #0f172a; overflow-x: hidden; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) {
+      animation: 0.8s ease-in-out both storm-exit;
+    }
+    ::view-transition-new(root) {
+      animation: 0.9s ease-in-out both storm-enter;
+    }
+    @keyframes storm-exit {
+      0% { opacity: 1; filter: brightness(1) contrast(1); }
+      30% { opacity: 0.9; filter: brightness(4) contrast(2) drop-shadow(0 0 45px #60a5fa); }
+      55% { opacity: 0.8; filter: brightness(1.6); }
+      75% { opacity: 0.95; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      100% { opacity: 0; filter: brightness(0.2); }
+    }
+    @keyframes storm-enter {
+      0% { opacity: 0; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      30% { opacity: 0.85; filter: brightness(3.5) contrast(1.8); }
+      60% { opacity: 0.95; filter: brightness(2); }
+      85% { opacity: 1; filter: brightness(2.5) drop-shadow(0 0 30px #60a5fa); }
+      100% { opacity: 1; filter: brightness(1) contrast(1) drop-shadow(0 0 0 transparent); }
+    }
+
+    /* VISIBLE 6S RAIN CANVAS & OVERLAY */
+    #storm-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 99999;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      background: radial-gradient(circle at 50% 30%, rgba(96,165,250,0.15) 0%, rgba(11,15,25,0.6) 100%);
+    }
+    #storm-overlay.active { opacity: 1; }
+    #rain-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .lightning-flash {
+      position: absolute;
+      inset: 0;
+      background: rgba(219, 234, 254, 0.45);
+      mix-blend-mode: overlay;
+      opacity: 0;
+    }
+    .lightning-flash.strike-1 { animation: flash-strike 1.2s ease-out; }
+    @keyframes flash-strike {
+      0% { opacity: 0; }
+      8% { opacity: 1; }
+      20% { opacity: 0.2; }
+      30% { opacity: 0.95; }
+      55% { opacity: 0.15; }
+      75% { opacity: 0.8; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+  <header class="sticky top-0 z-50 bg-slate-800/95 backdrop-blur border-b border-slate-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-red-900/30">ERN</div>
+          <div><h1 class="text-base sm:text-lg font-bold text-white leading-tight">EAS Relay Network</h1><p class="text-xs text-slate-400 font-mono">ERN / VTWF — Admin Console</p></div>
+        </div>
+        <nav class="flex items-center gap-1 sm:gap-2">
+          <a href="/" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Dashboard</a>
+          <a href="/announcements.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition relative inline-flex items-center gap-1.5">Announcements <span id="announcement-nav-badge" class="hidden px-1.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full bg-red-600 text-white shadow-sm shadow-red-500/50 animate-pulse">!</span></a>
+          <a href="/links.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Links</a>
+          <a href="/settings.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Settings</a>
+          <a id="logout-btn" class="px-3 py-1.5 text-sm font-medium text-red-400 rounded-lg hover:bg-red-500/10 transition cursor-pointer">Logout</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+  <main class="max-w-4xl mx-auto px-4 py-8">
+    <div id="auth-gate" class="hidden"><div class="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center"><p class="text-slate-400">Checking session...</p></div></div>
+    <div id="console" class="hidden">
+      <div class="max-w-4xl mx-auto p-6 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-800">
+        <!-- Station Status & Local Coverage Switches -->
+        <div class="mb-6 space-y-4">
+          <!-- 1. Station Broadcast Status -->
+          <div class="p-4 rounded-xl bg-slate-800/90 border border-slate-700">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span id="statusIndicatorDot" class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <h3 class="text-base font-bold text-white">Live Station Broadcast Status</h3>
+                </div>
+                <p id="statusDescription" class="text-xs text-slate-400 mt-1">Controls the live operational / offline status indicator and banner across the entire website for all visitors.</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span id="statusLabel" class="text-sm font-bold text-emerald-400 font-mono">OPERATIONAL (ONLINE)</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="statusToggle" class="sr-only peer" checked>
+                  <div class="w-14 h-7 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Local Coverage (Severe Weather Coverage Mode) -->
+          <div class="p-4 rounded-xl bg-slate-800/90 border border-slate-700">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span id="wxIndicatorDot" class="w-3 h-3 rounded-full bg-slate-500"></span>
+                  <h3 class="text-base font-bold text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Local Severe Weather Coverage
+                  </h3>
+                </div>
+                <p id="wxDescription" class="text-xs text-slate-400 mt-1">Activates emergency high-alert banner, storm animation, and priority EAS weather monitoring across the site.</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span id="wxLabel" class="text-sm font-bold text-slate-400 font-mono">STANDBY (OFF)</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="wxToggle" class="sr-only peer">
+                  <div class="w-14 h-7 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-orange-600"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. EAS Alert Simulator & Transmission Control -->
+          <div class="p-4 rounded-xl bg-slate-800/90 border border-slate-700">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                  <h3 class="text-base font-bold text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    EAS Alert Simulator &amp; Active Broadcast Control
+                  </h3>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Simulate live emergency activations (TOR, SVR, FFW, RWT, CIV) with auto-countdown timers, or instantly clear active alert states.</p>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button id="admin-test-alert-btn" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg transition shadow-md flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  Generate Test Alert
+                </button>
+                <button id="admin-clear-alerts-btn" class="px-3.5 py-2 bg-red-600/80 hover:bg-red-600 text-white font-bold text-xs rounded-lg transition shadow-md flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  Clear All Alerts
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. System Diagnostics & Health Test -->
+          <div class="p-4 rounded-xl bg-slate-800/90 border border-slate-700">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                  <h3 class="text-base font-bold text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    Station System &amp; Network Health Diagnostics
+                  </h3>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Runs a full live end-to-end diagnostic check across Icecast audio, Cloudflare Durable Objects, Now Playing feed, and Discord webhook links.</p>
+              </div>
+              <button id="run-sys-test-btn" class="flex-shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg transition shadow-md flex items-center gap-2">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Run System Test
+              </button>
+            </div>
+            <!-- Test Output Panel -->
+            <div id="sys-test-panel" class="hidden mt-4 pt-3 border-t border-slate-700/60">
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5" id="sys-test-results">
+                <!-- Dynamic Test Items -->
+              </div>
+            </div>
+          </div>
+
+          <div id="statusToast" class="hidden p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-xs font-medium flex items-center justify-between">
+            <span id="statusToastText" class="text-emerald-400">Settings synced globally!</span>
+            <span class="text-slate-500 font-mono">Live Network Sync</span>
+          </div>
+        </div>
+
+        <h2 class="text-2xl font-bold mb-4 text-slate-100 flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-red-500 animate-pulse"></span>ERN / VTWF Station Announcement Console</h2>
+        
+        <!-- Quick Preset Dropdown -->
+        <div class="mb-4 p-4 rounded-xl bg-slate-800/80 border border-slate-700/80">
+          <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Quick Broadcast Preset (Select to auto-fill)
+          </label>
+          <select id="presetSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none text-sm cursor-pointer">
+            <option value="">-- Choose a Preset (30 Comprehensive Options Available) --</option>
+            <optgroup label="⭐ Station Updates & Enhancements">
+              <option value="website_update">Website Update &amp; Live Doppler Radar</option>
+              <option value="system_test">Comprehensive System &amp; Relay Pipeline Test</option>
+              <option value="wjon_relay">WJON-IP Relay Integration &amp; Audio Switch</option>
+              <option value="schedule_update">Broadcast Lineup &amp; Schedule Update</option>
+              <option value="app_update">Dashboard Feature Upgrade &amp; Real-time Decoders</option>
+            </optgroup>
+            <optgroup label="🧪 Tests & Routine Operations">
+              <option value="rwt">Required Weekly Test (RWT)</option>
+              <option value="rmt">Required Monthly Test (RMT)</option>
+              <option value="dmo">Practice / Demo Warning (DMO)</option>
+              <option value="routine_maint">Routine Server &amp; Encoder Maintenance</option>
+              <option value="all_clear">All Clear / Normal Broadcast Resumed</option>
+              <option value="overnight_ops">Overnight Automated Relay Mode</option>
+            </optgroup>
+            <optgroup label="⚠️ Outages, Relays & Engineering">
+              <option value="unscheduled_offline">Unscheduled Station Offline / Outage Alert</option>
+              <option value="stream_down">Icecast Primary Stream Disconnection</option>
+              <option value="emergency_maint">Emergency Server Infrastructure Maintenance</option>
+              <option value="stream_degraded">Degraded Audio &amp; Packet Loss Advisory</option>
+              <option value="com_failure">EAS Serial Decoder Hardware Fault</option>
+              <option value="off_air">Station Scheduled Off-Air Standby</option>
+              <option value="transmitter_switch">Transmitter Relay Power Switch</option>
+            </optgroup>
+            <optgroup label="⛈️ Severe Weather & NOAA Relays">
+              <option value="tor_warn">Tornado Warning (TOR) — Take Shelter Immediately</option>
+              <option value="tor_watch">Tornado Watch (TOA) in Effect</option>
+              <option value="svr_warn">Severe Thunderstorm Warning (SVR)</option>
+              <option value="ffw_warn">Flash Flood Warning (FFW) — Move to Higher Ground</option>
+              <option value="smw_warn">Special Marine Warning (SMW) — Coastal Waters</option>
+              <option value="blizzard_warn">Blizzard / Winter Storm Warning (WSW)</option>
+              <option value="extreme_wind">High Wind / Extreme Wind Warning (EWW)</option>
+              <option value="heat_advisory">Excessive Heat Warning / Advisory</option>
+            </optgroup>
+            <optgroup label="🚨 Civil, National & Public Safety">
+              <option value="eas_active">Live EAS Emergency Alert Activation</option>
+              <option value="civil_danger">Civil Emergency / Evacuation Order (CEM/EVI)</option>
+              <option value="amber_alert">Child Abduction Emergency (CAE / AMBER Alert)</option>
+              <option value="blue_alert">Law Enforcement Blue Alert (BLU)</option>
+              <option value="national_alert">National Emergency Action Notification (EAN)</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <form id="announcementForm" class="space-y-4 mb-8">
+          <div id="editBanner" class="hidden p-3 rounded-lg bg-blue-900/40 border border-blue-500/40 flex items-center justify-between">
+            <span class="text-sm font-semibold text-blue-300 flex items-center gap-2">
+              <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+              Editing Announcement — Updates will sync live to Discord
+            </span>
+            <button type="button" id="cancelEditBtn" class="text-xs font-semibold text-slate-300 hover:text-white bg-slate-700/60 px-2.5 py-1 rounded transition">Cancel Edit</button>
+          </div>
+          <div><label class="block text-sm font-medium text-slate-400 mb-1">Announcement Title</label><input type="text" id="annTitle" placeholder="e.g., Scheduled Network Maintenance / Emergency Test" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"></div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-400 mb-1">Alert Level / Category</label>
+              <select id="annPriority" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="INFO">Information (Blue)</option>
+                <option value="NOTICE">Station Notice (Cyan)</option>
+                <option value="TEST">EAS Test (Green)</option>
+                <option value="MAINTENANCE">Maintenance (Purple)</option>
+                <option value="ADVISORY">Advisory (Yellow)</option>
+                <option value="WARNING">Warning / Alert (Amber)</option>
+                <option value="SEVERE">Severe Weather (Orange)</option>
+                <option value="EMERGENCY">Emergency / EAS Priority (Red)</option>
+                <option value="CRITICAL">Critical Relay Action (Crimson)</option>
+              </select>
+            </div>
+            <div><label class="block text-sm font-medium text-slate-400 mb-1">Operator / Station ID</label><input type="text" id="annAuthor" value="ERN Control Ops" required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"></div>
+          </div>
+          <div><label class="block text-sm font-medium text-slate-400 mb-1">Announcement Content</label><textarea id="annMessage" rows="4" placeholder="Type the station update or broadcast details here..." required class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-blue-500 outline-none"></textarea></div>
+          <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-500 font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2">Broadcast Announcement &amp; Send to Discord</button>
+        </form>
+        <hr class="border-slate-800 my-6">
+        <div class="flex items-center justify-between mb-4"><h3 class="text-xl font-semibold text-slate-200">Live Website Announcements (All Visitors)</h3><button id="clear-all" class="text-xs text-red-400 hover:text-red-300 font-medium transition">Clear All</button></div>
+        <div id="announcementsFeed" class="space-y-4"><p id="emptyState" class="text-slate-500 italic text-sm">No station announcements posted yet.</p></div>
+      </div>
+    </div>
+  </main>
+  <footer class="border-t border-slate-800 mt-8">
+    <div class="max-w-7xl mx-auto px-4 py-6 text-center">
+      <p class="text-sm text-slate-400">EAS Relay Network (ERN) — Broadcasting from New York City, New York</p>
+      <p class="text-sm font-semibold text-slate-300 mt-1">&copy; 2026 ERN / EAS Relay Network. All rights reserved.</p>
+    </div>
+  </footer>
+  <script>
+    const token = localStorage.getItem('ern_admin_token') || sessionStorage.getItem('ern_admin_token');
+    const authGate = document.getElementById('auth-gate');
+    const consoleEl = document.getElementById('console');
+    if (!token) { 
+      window.location.href = '/login.html'; 
+    } else { 
+      try { 
+        const decoded = atob(token); 
+        if (!decoded.includes(':ern-admin')) { 
+          window.location.href = '/login.html'; 
+        } else { 
+          // Verify session and client IP with backend worker
+          fetch('/api/verify-session', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+          }).then(res => {
+            if (!res.ok) {
+              console.warn("Unauthorized IP address or expired admin session.");
+              localStorage.removeItem('ern_admin_token');
+              sessionStorage.removeItem('ern_admin_token');
+              window.location.href = '/login.html';
+            } else {
+              localStorage.setItem('ern_admin_token', token);
+              sessionStorage.setItem('ern_admin_token', token);
+              authGate.classList.add('hidden'); 
+              consoleEl.classList.remove('hidden');
+            }
+          }).catch(() => {
+            // Offline/fallback check
+            authGate.classList.add('hidden'); 
+            consoleEl.classList.remove('hidden');
+          });
+        } 
+      } catch { 
+        window.location.href = '/login.html'; 
+      } 
+    }
+    document.getElementById('logout-btn').addEventListener('click', () => { 
+      localStorage.removeItem('ern_admin_token');
+      sessionStorage.removeItem('ern_admin_token'); 
+      window.location.href = '/login.html'; 
+    });
+    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1539383686993023028/Q7x4V3a6C_trfuRKOAo024dvldB75WtFbFrWbzd8fYyaVI1da-aYHt4h5ZJI8vR3wSMN";
+    const STORAGE_KEY = 'ern_announcements';
+    let loadedAnnouncements = [];
+    let editingAnnouncementId = null;
+
+    function renderAnnouncements(announcements) {
+      loadedAnnouncements = announcements || [];
+      const feed = document.getElementById('announcementsFeed');
+      if (!announcements || announcements.length === 0) {
+        feed.innerHTML = '<p id="emptyState" class="text-slate-500 italic text-sm">No station announcements posted yet.</p>';
+        return;
+      }
+      feed.innerHTML = announcements.map(a => {
+        const badgeColor = getPriorityBadgeClass(a.priority);
+        const dateStr = a.date || (a.timestamp ? new Date(a.timestamp).toLocaleString() : new Date().toLocaleString());
+        const editedBadge = (a.isEdited || a.editedAt) ? '<span class="text-amber-400 font-semibold ml-1">(Edited on Discord)</span>' : '';
+        return `<div class="p-4 rounded-lg bg-slate-800/80 border border-slate-700/60 transition-all shadow-sm flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-2 flex-wrap">
+              <span class="text-xs font-bold uppercase px-2.5 py-0.5 rounded border ${badgeColor}">${a.priority || 'INFO'}</span>
+              <span class="text-xs text-slate-500">${dateStr} • by ${a.author || 'ERN Control Ops'}${editedBadge}</span>
+            </div>
+            <h4 class="font-bold text-lg text-slate-100">${a.title || ''}</h4>
+            <p class="text-slate-300 text-sm mt-1 whitespace-pre-wrap">${a.message || ''}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button onclick="startEditAnnouncement('${a.id}')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 border border-blue-500/30 transition flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+              Edit
+            </button>
+            <button onclick="deleteSingleAnnouncement('${a.id}')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/40 border border-red-500/30 transition flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+              Delete
+            </button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function startEditAnnouncement(id) {
+      const ann = loadedAnnouncements.find(a => a.id === id);
+      if (!ann) return;
+      editingAnnouncementId = id;
+      document.getElementById('annTitle').value = ann.title || '';
+      document.getElementById('annPriority').value = ann.priority || 'INFO';
+      document.getElementById('annAuthor').value = ann.author || 'ERN Control Ops';
+      document.getElementById('annMessage').value = ann.message || '';
+      
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.innerText = "Update Announcement & Edit on Discord";
+      submitBtn.className = "w-full bg-amber-600 hover:bg-amber-500 font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-white shadow-lg shadow-amber-600/20";
+      
+      document.getElementById('editBanner').classList.remove('hidden');
+      document.getElementById('announcementForm')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function cancelEditAnnouncement() {
+      editingAnnouncementId = null;
+      document.getElementById('annTitle').value = '';
+      document.getElementById('annMessage').value = '';
+      document.getElementById('annPriority').value = 'INFO';
+      document.getElementById('presetSelect').value = '';
+      
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.innerText = "Broadcast Announcement & Send to Discord";
+      submitBtn.className = "w-full bg-blue-600 hover:bg-blue-500 font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-white";
+      
+      document.getElementById('editBanner').classList.add('hidden');
+    }
+
+    async function deleteSingleAnnouncement(id) {
+      if (!confirm('Delete this announcement from the website and Discord?')) return;
+      try {
+        await fetch(`/api/announcements?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+      } catch (e) {}
+      await fetchAnnouncements();
+      checkAnnouncementsBadge();
+    }
+
+    document.getElementById('cancelEditBtn')?.addEventListener('click', cancelEditAnnouncement);
+
+    async function fetchAnnouncements() {
+      try {
+        const res = await fetch('/api/announcements?t=' + Date.now(), { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          renderAnnouncements(data);
+          return;
+        }
+      } catch (e) {}
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) renderAnnouncements(JSON.parse(stored));
+      } catch(e) {}
+    }
+    
+    const statusToggle = document.getElementById('statusToggle');
+    const statusLabel = document.getElementById('statusLabel');
+    const statusDot = document.getElementById('statusIndicatorDot');
+
+    const wxToggle = document.getElementById('wxToggle');
+    const wxLabel = document.getElementById('wxLabel');
+    const wxDot = document.getElementById('wxIndicatorDot');
+
+    async function fetchStationStatus() {
+      try {
+        const res = await fetch('/api/status', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          localStorage.setItem('ern_station_status', data.status);
+          localStorage.setItem('ern_severe_weather', data.severeWeather ? 'true' : 'false');
+          updateStatusUI(data.status, data.severeWeather);
+        }
+      } catch (e) {}
+    }
+
+    function updateStatusUI(status, severeWeather = false) {
+      const isOnline = status !== 'OFFLINE';
+      statusToggle.checked = isOnline;
+      if (isOnline) {
+        statusLabel.textContent = 'OPERATIONAL (ONLINE)';
+        statusLabel.className = 'text-sm font-bold text-emerald-400 font-mono';
+        statusDot.className = 'w-3 h-3 rounded-full bg-emerald-500 animate-pulse';
+      } else {
+        statusLabel.textContent = 'OFFLINE (OFF-AIR)';
+        statusLabel.className = 'text-sm font-bold text-slate-400 font-mono';
+        statusDot.className = 'w-3 h-3 rounded-full bg-slate-500';
+      }
+
+      const isWx = Boolean(severeWeather);
+      wxToggle.checked = isWx;
+      if (isWx) {
+        wxLabel.textContent = 'ACTIVE (COVERAGE ON)';
+        wxLabel.className = 'text-sm font-bold text-orange-400 font-mono';
+        wxDot.className = 'w-3 h-3 rounded-full bg-orange-500 animate-ping';
+      } else {
+        wxLabel.textContent = 'STANDBY (OFF)';
+        wxLabel.className = 'text-sm font-bold text-slate-400 font-mono';
+        wxDot.className = 'w-3 h-3 rounded-full bg-slate-500';
+      }
+    }
+
+    const statusToast = document.getElementById('statusToast');
+    const statusToastText = document.getElementById('statusToastText');
+    let toastTimeout;
+
+    function showStatusToast(msg, isSuccess = true) {
+      clearTimeout(toastTimeout);
+      statusToast.classList.remove('hidden');
+      statusToastText.textContent = msg;
+      statusToastText.className = isSuccess ? 'text-emerald-400 font-medium' : 'text-red-400 font-medium';
+      toastTimeout = setTimeout(() => {
+        statusToast.classList.add('hidden');
+      }, 4000);
+    }
+
+    statusToggle.addEventListener('change', async () => {
+      const newStatus = statusToggle.checked ? 'OPERATIONAL' : 'OFFLINE';
+      localStorage.setItem('ern_station_status', newStatus);
+      updateStatusUI(newStatus, wxToggle.checked);
+      showStatusToast(`Updating broadcast status to ${newStatus}...`);
+      try {
+        const res = await fetch('/api/status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (res.ok) {
+          showStatusToast(`Broadcast status is now ${newStatus} globally!`);
+        } else {
+          showStatusToast('Failed to update status on server.', false);
+        }
+      } catch (e) {
+        console.error('Failed to update station status:', e);
+        showStatusToast('Network error updating status.', false);
+      }
+    });
+
+    wxToggle.addEventListener('change', async () => {
+      const isWx = wxToggle.checked;
+      localStorage.setItem('ern_severe_weather', isWx ? 'true' : 'false');
+      updateStatusUI(statusToggle.checked ? 'OPERATIONAL' : 'OFFLINE', isWx);
+      showStatusToast(`Setting severe weather mode to ${isWx ? 'ACTIVE' : 'STANDBY'}...`);
+      try {
+        const res = await fetch('/api/status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ severeWeather: isWx })
+        });
+        if (res.ok) {
+          showStatusToast(`Severe weather coverage is now ${isWx ? 'ACTIVE' : 'STANDBY'} globally!`);
+        } else {
+          showStatusToast('Failed to update weather mode on server.', false);
+        }
+      } catch (e) {
+        console.error('Failed to update weather mode:', e);
+        showStatusToast('Network error updating weather mode.', false);
+      }
+
+      // Auto-broadcast announcement & Discord alert for severe weather mode
+      const annTitle = isWx 
+        ? "Local Severe Weather Coverage Activated" 
+        : "Local Severe Weather Coverage Deactivated — Normal Operations";
+      const annPriority = isWx ? "SEVERE" : "NOTICE";
+      const annAuthor = "ERN Control Ops";
+      const annMessage = isWx
+        ? "⚠️ ERN / VTWF has activated live Local Severe Weather Coverage for NYC and surrounding areas. Relays are continuously monitoring all NWS alert feeds, radar networks, and civil emergency channels."
+        : "✅ Local Severe Weather Coverage has concluded. All station relays and broadcast systems have resumed normal operational status.";
+      const badgeColor = getPriorityBadgeClass(annPriority);
+      const timestamp = new Date().toLocaleString();
+      const annHtml = '<div class="p-4 rounded-lg bg-slate-800/80 border border-slate-700/60 transition-all shadow-sm"><div class="flex items-center justify-between mb-2"><span class="text-xs font-bold uppercase px-2.5 py-0.5 rounded border ' + badgeColor + '">' + annPriority + '</span><span class="text-xs text-slate-500">' + timestamp + ' • by ' + annAuthor + '</span></div><h4 class="font-bold text-lg text-slate-100">' + annTitle + '</h4><p class="text-slate-300 text-sm mt-1 whitespace-pre-wrap">' + annMessage + '</p></div>';
+
+      try {
+        await fetch('/api/announcements', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ title: annTitle, priority: annPriority, author: annAuthor, message: annMessage, html: annHtml })
+        });
+        await fetchAnnouncements();
+        checkAnnouncementsBadge();
+      } catch (err) {
+        console.error("Auto weather announcement error:", err);
+      }
+    });
+
+    fetchStationStatus();
+    setInterval(fetchStationStatus, 5000);
+
+    fetchAnnouncements();
+    setInterval(fetchAnnouncements, 5000);
+
+    // Preset Definitions (30 Total Comprehensive Options)
+    const PRESETS = {
+      website_update: {
+        title: "Website Dashboard Update: Live Doppler Radar & Weather Overlays",
+        priority: "NOTICE",
+        message: "The ERN / VTWF emergency broadcast dashboard has been upgraded with a high-resolution Live Doppler Weather Radar (NEXRAD / OpenWeatherMap) with precipitation intensity layers, real-time cloud coverage, and wind vector tracking for the NYC coverage area."
+      },
+      system_test: {
+        title: "Comprehensive Network System & Relay Infrastructure Test",
+        priority: "TEST",
+        message: "ERN control operations are initiating a routine full-system diagnostic verification across all primary encoders, Cloudflare Durable Objects, Icecast streaming relays, and automated alert delivery pipelines. Normal programming remains uninterrupted."
+      },
+      wjon_relay: {
+        title: "WJON-IP Broadcast Relay & Failover Audio Integration",
+        priority: "INFO",
+        message: "ERN / VTWF has integrated high-fidelity mutual relay operations with WJON-IP (Fairfax, VA). The broadcast dashboard now features automatic bidirectional failover and dual-station EAS alert decoding."
+      },
+      schedule_update: {
+        title: "Relay Schedule & Lineup Update",
+        priority: "INFO",
+        message: "An updated broadcast schedule and stream lineup has been posted. Weekly tests and automated civil alerts will proceed according to the updated schedule."
+      },
+      app_update: {
+        title: "Station Software Upgrade: Live ZCZC Terminal & Alert Log Scroller",
+        priority: "NOTICE",
+        message: "ERN engineers have deployed a major station telemetry update featuring a Live SAME/ZCZC Stream Demodulator Terminal, real-time alert countdown clocks, and scrollable transmission logs."
+      },
+      rwt: {
+        title: "Required Weekly Test (RWT) Alert",
+        priority: "TEST",
+        message: "The Emergency Alert System relay network is conducting the Required Weekly Test (RWT). This is only a test of the broadcast alert relay equipment. Normal programming will resume immediately following this transmission."
+      },
+      rmt: {
+        title: "Required Monthly Test (RMT) Alert",
+        priority: "TEST",
+        message: "The following is the Required Monthly Test (RMT) of the Emergency Alert System. Operational centers are testing relay links across the regional broadcast network. No emergency action is required."
+      },
+      dmo: {
+        title: "Practice / Demonstration Emergency Alert (DMO)",
+        priority: "TEST",
+        message: "This is a demonstration broadcast of the Emergency Alert System. In the event of an actual civil emergency or disaster, official instructions will follow this alert tone."
+      },
+      routine_maint: {
+        title: "Scheduled Network Maintenance Advisory",
+        priority: "MAINTENANCE",
+        message: "Scheduled routine maintenance is currently underway on the ERN / VTWF relay servers. Broadcast audio and telemetry may experience brief momentary buffering."
+      },
+      all_clear: {
+        title: "All Clear — Normal Operations Resumed",
+        priority: "NOTICE",
+        message: "All previous alert conditions or maintenance procedures have concluded. All station systems, relay streams, and decoders are fully operational."
+      },
+      overnight_ops: {
+        title: "Overnight Automated Relay Broadcast Active",
+        priority: "INFO",
+        message: "ERN / VTWF has entered automated overnight relay operations. Continuous EAS monitoring, NOAA weather bulletins, and failover audio remain active 24/7."
+      },
+      unscheduled_offline: {
+        title: "Unscheduled Station Offline / Outage Alert",
+        priority: "CRITICAL",
+        message: "ERN / VTWF broadcast stream has experienced an unexpected offline interruption. Engineers are actively investigating the outage and working to restore connectivity immediately."
+      },
+      stream_down: {
+        title: "Icecast Stream Connection Lost",
+        priority: "WARNING",
+        message: "The primary Icecast relay connection has dropped. Backup relay streams are attempting automatic failover. Please stand by while the audio link reconnects."
+      },
+      emergency_maint: {
+        title: "Emergency Server Maintenance Notice",
+        priority: "MAINTENANCE",
+        message: "Urgent unscheduled maintenance is being performed on the primary stream infrastructure. Relays are switching to secondary backup encoders. Stand by for status updates."
+      },
+      stream_degraded: {
+        title: "Icecast Stream Audio Degraded",
+        priority: "ADVISORY",
+        message: "We are currently investigating upstream audio degradation and packet loss on the primary stream. Technicians are recalibrating the encoder feed."
+      },
+      com_failure: {
+        title: "EAS Serial Decoder Hardware Fault",
+        priority: "WARNING",
+        message: "A hardware telemetry fault has been detected on the physical EAS COM serial interface. Automated EAS alert decoding may be delayed until the port is power-cycled."
+      },
+      off_air: {
+        title: "Station Off-Air / Transmitter Standby",
+        priority: "WARNING",
+        message: "ERN / VTWF broadcast stream is temporarily off-air for scheduled transmitter downtime. The live stream will return shortly."
+      },
+      transmitter_switch: {
+        title: "Primary Transmitter Switch & Antenna Maintenance",
+        priority: "MAINTENANCE",
+        message: "Operations are switching transmission to the auxiliary transmitter feed during routine tower and RF feedline inspections. Expect minor signal fluctuations."
+      },
+      tor_warn: {
+        title: "Tornado Warning (TOR) — Seek Immediate Shelter",
+        priority: "EMERGENCY",
+        message: "The National Weather Service has issued a Tornado Warning for the broadcast coverage area. A tornado has been indicated by radar or spotted. Take shelter immediately in an interior room on the lowest floor of a sturdy building."
+      },
+      tor_watch: {
+        title: "Tornado Watch (TOA) Activated",
+        priority: "SEVERE",
+        message: "A Tornado Watch is in effect for our coverage area. Conditions are favorable for the development of tornadoes and severe thunderstorms. Remain alert for approaching storms."
+      },
+      svr_warn: {
+        title: "Severe Thunderstorm Warning (SVR) in Effect",
+        priority: "SEVERE",
+        message: "The National Weather Service has issued a Severe Thunderstorm Warning. Damaging winds exceeding 60 MPH and large hail are expected. Move indoors immediately."
+      },
+      ffw_warn: {
+        title: "Flash Flood Warning (FFW) — Move to Higher Ground",
+        priority: "EMERGENCY",
+        message: "A Flash Flood Warning has been issued. Rapid flooding of creeks, urban streets, and low-lying areas is occurring. Do not attempt to drive through flooded roads. Turn around, don't drown."
+      },
+      smw_warn: {
+        title: "Special Marine Warning (SMW) — Coastal Waters",
+        priority: "SEVERE",
+        message: "A Special Marine Warning is in effect for NYC harbor and adjacent coastal waters. Mariners should seek safe harbor immediately due to sudden strong wind gusts and hazardous seas."
+      },
+      blizzard_warn: {
+        title: "Blizzard / Winter Storm Warning (WSW) in Effect",
+        priority: "SEVERE",
+        message: "A Blizzard / Winter Storm Warning has been issued. Heavy snow, freezing ice, and dangerous travel conditions are expected across the region. Limit travel to emergencies only."
+      },
+      extreme_wind: {
+        title: "Extreme Wind Warning (EWW) Active",
+        priority: "EMERGENCY",
+        message: "An Extreme Wind Warning has been issued. Destructive, life-threatening winds are imminent. Treat this as you would a tornado warning and take shelter immediately."
+      },
+      heat_advisory: {
+        title: "Excessive Heat Warning & Heat Health Advisory",
+        priority: "ADVISORY",
+        message: "An Excessive Heat Warning is in effect. Dangerous heat index values will create hazardous outdoor conditions. Stay hydrated, stay in air-conditioned spaces, and check on vulnerable neighbors."
+      },
+      eas_active: {
+        title: "Live EAS Emergency Alert Activation",
+        priority: "EMERGENCY",
+        message: "An active Emergency Alert System message has been received on the relay network. Monitor the alert logs and live stream for official civil authority instructions."
+      },
+      civil_danger: {
+        title: "Civil Emergency / Evacuation Order Broadcast",
+        priority: "CRITICAL",
+        message: "A high-priority civil emergency broadcast has been issued for the local coverage area. Immediate protective actions or evacuations are recommended by civil emergency management."
+      },
+      amber_alert: {
+        title: "Child Abduction Emergency (CAE / AMBER Alert)",
+        priority: "EMERGENCY",
+        message: "Law enforcement authorities have activated an AMBER Alert / Child Abduction Emergency. Please monitor the broadcast stream and official emergency channels for vehicle and suspect descriptions."
+      },
+      blue_alert: {
+        title: "Law Enforcement Blue Alert (BLU) Broadcast",
+        priority: "WARNING",
+        message: "A Blue Alert has been activated by state law enforcement agencies. Be on the lookout for suspects involved in critical incidents concerning public safety officers."
+      },
+      national_alert: {
+        title: "National Emergency Alert Message (EAN)",
+        priority: "CRITICAL",
+        message: "A National Action Notification (EAN) has been activated across the Emergency Alert System. All stations and relay operations must stand by for national emergency information."
+      }
+    };
+
+    document.getElementById('presetSelect').addEventListener('change', function(e) {
+      const val = e.target.value;
+      if (!val || !PRESETS[val]) return;
+      const p = PRESETS[val];
+      document.getElementById('annTitle').value = p.title;
+      document.getElementById('annPriority').value = p.priority;
+      document.getElementById('annMessage').value = p.message;
+    });
+
+    // ===== SYSTEM DIAGNOSTICS & HEALTH TEST =====
+    const runSysTestBtn = document.getElementById('run-sys-test-btn');
+    const sysTestPanel = document.getElementById('sys-test-panel');
+    const sysTestResults = document.getElementById('sys-test-results');
+
+    if (runSysTestBtn) {
+      runSysTestBtn.addEventListener('click', async () => {
+        runSysTestBtn.disabled = true;
+        runSysTestBtn.innerHTML = '<span class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> Testing System...';
+        sysTestPanel.classList.remove('hidden');
+        sysTestResults.innerHTML = `
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-700/80 animate-pulse">
+            <div class="text-xs text-slate-400 font-mono">Audio Stream Relay</div>
+            <div class="text-sm font-bold text-slate-200 mt-1">Connecting...</div>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-700/80 animate-pulse">
+            <div class="text-xs text-slate-400 font-mono">Durable Object Sync</div>
+            <div class="text-sm font-bold text-slate-200 mt-1">Querying...</div>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-700/80 animate-pulse">
+            <div class="text-xs text-slate-400 font-mono">Now Playing API</div>
+            <div class="text-sm font-bold text-slate-200 mt-1">Checking metadata...</div>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-700/80 animate-pulse">
+            <div class="text-xs text-slate-400 font-mono">Weather Radar Tiles</div>
+            <div class="text-sm font-bold text-slate-200 mt-1">Validating...</div>
+          </div>
+        `;
+
+        const tests = [
+          { name: "Audio Stream Relay", test: async () => {
+            const start = performance.now();
+            const res = await fetch("https://icecast.gwes-eas.network/status-json.xsl", { cache: "no-store" });
+            const lat = Math.round(performance.now() - start);
+            if (res.ok) return { ok: true, msg: `Online (${lat}ms)`, detail: "Icecast OK" };
+            throw new Error(`HTTP ${res.status}`);
+          }},
+          { name: "Durable Object Sync", test: async () => {
+            const start = performance.now();
+            const res = await fetch("/api/status", { cache: "no-store" });
+            const lat = Math.round(performance.now() - start);
+            if (res.ok) return { ok: true, msg: `Synced (${lat}ms)`, detail: "DO Storage OK" };
+            throw new Error(`HTTP ${res.status}`);
+          }},
+          { name: "Now Playing API", test: async () => {
+            const start = performance.now();
+            const res = await fetch("/api/nowplaying", { cache: "no-store" });
+            const lat = Math.round(performance.now() - start);
+            if (res.ok) {
+              const data = await res.json();
+              return { ok: true, msg: `Active (${lat}ms)`, detail: data.title ? data.title.substring(0, 18) + "..." : "Broadcasting" };
+            }
+            throw new Error(`HTTP ${res.status}`);
+          }},
+          { name: "Weather Radar Tiles", test: async () => {
+            const start = performance.now();
+            const res = await fetch("https://tile.openweathermap.org/map/precipitation_new/6/19/24.png?appid=8bcd9678a11c455ba9223b2328f999f6", { cache: "no-store" });
+            const lat = Math.round(performance.now() - start);
+            if (res.ok) return { ok: true, msg: `Tile Feed OK (${lat}ms)`, detail: "Radar Ready" };
+            throw new Error(`HTTP ${res.status}`);
+          }}
+        ];
+
+        const results = [];
+        for (const t of tests) {
+          try {
+            const res = await t.test();
+            results.push({ name: t.name, ok: true, msg: res.msg, detail: res.detail });
+          } catch(err) {
+            results.push({ name: t.name, ok: false, msg: "Degraded / Offline", detail: err.message });
+          }
+        }
+
+        sysTestResults.innerHTML = results.map(r => `
+          <div class="p-3 rounded-lg bg-slate-900 border ${r.ok ? 'border-emerald-500/40' : 'border-red-500/40'}">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-slate-400 font-mono">${r.name}</span>
+              <span class="w-2 h-2 rounded-full ${r.ok ? 'bg-emerald-400' : 'bg-red-400'}"></span>
+            </div>
+            <div class="text-sm font-bold ${r.ok ? 'text-emerald-400' : 'text-red-400'} mt-1">${r.msg}</div>
+            <div class="text-[10px] text-slate-500 truncate mt-0.5">${r.detail}</div>
+          </div>
+        `).join('');
+
+        runSysTestBtn.disabled = false;
+        runSysTestBtn.innerHTML = `
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Re-run System Test
+        `;
+      });
+    }
+
+    // ===== EAS ALERT SIMULATOR & BROADCAST CONTROL (ADMIN) =====
+    const adminTestAlertBtn = document.getElementById('admin-test-alert-btn');
+    const adminClearAlertsBtn = document.getElementById('admin-clear-alerts-btn');
+
+    const sampleAlerts = [
+      { station: 'ERN-VTWF', code: 'TOR', org: 'NWS OKX', name: 'Tornado Warning', color: 'red', durationMin: 45, fips: '036061 (NYC/Tri-State)' },
+      { station: 'WJON-IP', code: 'SVR', org: 'NWS LWX', name: 'Severe Thunderstorm Warning', color: 'amber', durationMin: 45, fips: '51059 (Fairfax/DC)' },
+      { station: 'ERN-VTWF', code: 'FFW', org: 'NWS OKX', name: 'Flash Flood Warning', color: 'red', durationMin: 60, fips: '036061 (NYC/Tri-State)' },
+      { station: 'WJON-IP', code: 'RWT', org: 'WJON', name: 'Required Weekly Test', color: 'green', durationMin: 15, fips: '51059 (Fairfax/DC)' },
+      { station: 'ERN-VTWF', code: 'RWT', org: 'WNYW', name: 'Required Weekly Test', color: 'green', durationMin: 15, fips: '036061 (NYC/Tri-State)' },
+      { station: 'WJON-IP', code: 'CIV', org: 'VADEM', name: 'Civil Emergency Message', color: 'red', durationMin: 60, fips: '51059 (Fairfax/DC)' },
+      { station: 'ERN-VTWF', code: 'CIV', org: 'NYC OEM', name: 'Civil Emergency Message', color: 'red', durationMin: 60, fips: '036061 (NYC/Tri-State)' }
+    ];
+
+    if (adminTestAlertBtn) {
+      adminTestAlertBtn.addEventListener('click', () => {
+        const pick = sampleAlerts[Math.floor(Math.random() * sampleAlerts.length)];
+        const alerts = JSON.parse(localStorage.getItem('ern_decoded_alerts') || '[]');
+        const nowMs = Date.now();
+        alerts.unshift({
+          id: 'alert_' + nowMs,
+          station: pick.station || 'ERN-VTWF',
+          timeMs: nowMs,
+          code: pick.code,
+          eventName: pick.name,
+          color: pick.color,
+          originator: pick.org,
+          fips: pick.fips,
+          expiresMs: nowMs + (pick.durationMin * 60 * 1000)
+        });
+        if (alerts.length > 50) alerts.pop();
+        localStorage.setItem('ern_decoded_alerts', JSON.stringify(alerts));
+        showToast(`Test EAS Alert Generated [${pick.station}]: ${pick.code} (${pick.name})`);
+      });
+    }
+
+    if (adminClearAlertsBtn) {
+      adminClearAlertsBtn.addEventListener('click', () => {
+        if (confirm('Clear all active and logged alert transmissions across the network?')) {
+          localStorage.removeItem('ern_decoded_alerts');
+          showToast('All alert transmissions and active emergencies cleared!');
+        }
+      });
+    }
+
+    function getPriorityColorHex(priority) {
+      switch((priority || '').toUpperCase()) {
+        case 'NOTICE': return 2067276;     // Cyan #1fb6ff
+        case 'TEST': return 2278750;       // Green #22c55e
+        case 'MAINTENANCE': return 10181046; // Purple #9b59b6
+        case 'ADVISORY': return 16766720;  // Yellow #ffd700
+        case 'WARNING': return 16761035;   // Amber #f59e0b
+        case 'SEVERE': return 15105570;    // Orange #e67e22
+        case 'EMERGENCY': return 15158332; // Red #e74c3c
+        case 'CRITICAL': return 10038562;  // Crimson #992d22
+        case 'INFO':
+        default: return 3447003;           // Blue #3498db
+      }
+    }
+
+    function getPriorityBadgeClass(priority) {
+      switch((priority || '').toUpperCase()) {
+        case 'NOTICE': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+        case 'TEST': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+        case 'MAINTENANCE': return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+        case 'ADVISORY': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+        case 'WARNING': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+        case 'SEVERE': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+        case 'EMERGENCY': return 'bg-red-500/10 text-red-400 border-red-500/20';
+        case 'CRITICAL': return 'bg-rose-600/20 text-rose-300 border-rose-600/40';
+        case 'INFO':
+        default: return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      }
+    }
+
+    document.getElementById('announcementForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      const title = document.getElementById('annTitle').value.trim();
+      const priority = document.getElementById('annPriority').value;
+      const author = document.getElementById('annAuthor').value.trim();
+      const message = document.getElementById('annMessage').value.trim();
+      if (!title || !message) return;
+
+      const isEdit = Boolean(editingAnnouncementId);
+      const targetId = editingAnnouncementId;
+
+      submitBtn.disabled = true; 
+      submitBtn.innerText = isEdit ? "Updating & Editing on Discord..." : "Broadcasting instantly...";
+      
+      const timestamp = new Date().toLocaleString();
+      const colorHex = getPriorityColorHex(priority);
+      const badgeColor = getPriorityBadgeClass(priority);
+      
+      const annHtml = '<div class="p-4 rounded-lg bg-slate-800/80 border border-slate-700/60 transition-all shadow-sm"><div class="flex items-center justify-between mb-2"><span class="text-xs font-bold uppercase px-2.5 py-0.5 rounded border ' + badgeColor + '">' + priority + '</span><span class="text-xs text-slate-500">' + timestamp + ' • by ' + author + (isEdit ? ' • (Edited)' : '') + '</span></div><h4 class="font-bold text-lg text-slate-100">' + title + '</h4><p class="text-slate-300 text-sm mt-1 whitespace-pre-wrap">' + message + '</p></div>';
+
+      try {
+        if (isEdit) {
+          await fetch('/api/announcements', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({ id: targetId, title, priority, author, message, html: annHtml })
+          });
+          cancelEditAnnouncement();
+        } else {
+          // Instant local render for new announcement
+          const currentStored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+          currentStored.unshift({
+            id: Date.now().toString(),
+            title, priority, author, message, html: annHtml, timestamp: Date.now()
+          });
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(currentStored));
+          renderAnnouncements(currentStored);
+          document.getElementById('announcementForm').reset();
+          document.getElementById('presetSelect').value = "";
+
+          await fetch('/api/announcements', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({ title, priority, author, message, html: annHtml })
+          });
+        }
+      } catch (err) {
+        console.error("Announcement dispatch error:", err);
+      }
+
+      submitBtn.disabled = false; 
+      submitBtn.innerText = "Broadcast Announcement & Send to Discord";
+      await fetchAnnouncements();
+      checkAnnouncementsBadge();
+    });
+
+    document.getElementById('clear-all').addEventListener('click', async () => {
+      if (!confirm('Clear all announcements from the network and website?')) return;
+      try {
+        await fetch('/api/announcements?id=all', {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+      } catch (e) {}
+      localStorage.removeItem(STORAGE_KEY);
+      await fetchAnnouncements();
+      checkAnnouncementsBadge();
+    });
+
+    // ===== LIVE ANNOUNCEMENTS BADGE SYNC =====
+    async function checkAnnouncementsBadge() {
+      const badge = document.getElementById('announcement-nav-badge');
+      if (!badge) return;
+      try {
+        const res = await fetch('/api/announcements', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const hasEmergency = data.some(a => a.priority === 'EMERGENCY');
+          const hasWarning = data.some(a => a.priority === 'WARNING');
+          badge.textContent = data.length > 1 ? `${data.length}` : '!';
+          badge.className = 'px-1.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full text-white shadow-sm animate-pulse ' + 
+            (hasEmergency ? 'bg-red-600 shadow-red-500/50' : (hasWarning ? 'bg-amber-600 shadow-amber-500/50' : 'bg-blue-600 shadow-blue-500/50'));
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      } catch(e) {}
+    }
+    checkAnnouncementsBadge();
+    setInterval(checkAnnouncementsBadge, 5000);
+
+    // ===== SYNCHRONIZED 6-SECOND THUNDERSTORM CANVAS & AUDIO =====
+    const overlay = document.createElement('div');
+    overlay.id = 'storm-overlay';
+    overlay.innerHTML = '<canvas id="rain-canvas"></canvas><div class="lightning-flash" id="flash-div"></div>';
+    document.body.appendChild(overlay);
+
+    const canvas = document.getElementById('rain-canvas');
+    const fDiv = document.getElementById('flash-div');
+    let ctx2D = null;
+    let rainDrops = [];
+    let rainAnimId = null;
+
+    function resizeRainCanvas() {
+      if (!canvas) return;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeRainCanvas);
+    resizeRainCanvas();
+
+    function initRain() {
+      rainDrops = [];
+      const numDrops = Math.floor((window.innerWidth * window.innerHeight) / 1000);
+      for (let i = 0; i < numDrops; i++) {
+        rainDrops.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          l: Math.random() * 30 + 15,
+          v: Math.random() * 20 + 24,
+          o: Math.random() * 0.4 + 0.3
+        });
+      }
+    }
+
+    function drawRain() {
+      if (!ctx2D) ctx2D = canvas.getContext('2d');
+      ctx2D.clearRect(0, 0, canvas.width, canvas.height);
+      ctx2D.strokeStyle = 'rgba(186, 230, 253, 0.7)';
+      ctx2D.lineWidth = 1.5;
+      ctx2D.beginPath();
+      for (let i = 0; i < rainDrops.length; i++) {
+        const d = rainDrops[i];
+        ctx2D.moveTo(d.x, d.y);
+        ctx2D.lineTo(d.x - 3, d.y + d.l);
+        d.y += d.v;
+        d.x -= 3;
+        if (d.y > canvas.height) {
+          d.y = -d.l;
+          d.x = Math.random() * (canvas.width + 100);
+        }
+      }
+      ctx2D.stroke();
+      rainAnimId = requestAnimationFrame(drawRain);
+    }
+
+    function triggerStormVisuals(remainingTime = 5000) {
+      resizeRainCanvas();
+      initRain();
+      overlay.classList.add('active');
+      fDiv.classList.remove('strike-1');
+      void fDiv.offsetWidth;
+      fDiv.classList.add('strike-1');
+      if (rainAnimId) cancelAnimationFrame(rainAnimId);
+      drawRain();
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+          if (rainAnimId) cancelAnimationFrame(rainAnimId);
+        }, 500);
+      }, remainingTime);
+    }
+
+    let globalAudioCtx = null;
+    function playThunderstormAudio(startOffset = 0) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!globalAudioCtx || globalAudioCtx.state === 'closed') {
+          globalAudioCtx = new AudioContext();
+        }
+        const ctx = globalAudioCtx;
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const duration = 5.0; // 2s before switch + 3s after switch
+        const remaining = Math.max(0.5, duration - startOffset);
+
+        // 1. Rain Layer
+        const rainBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const rainBuffer = ctx.createBuffer(2, rainBufferSize, ctx.sampleRate);
+        const rL = rainBuffer.getChannelData(0);
+        const rR = rainBuffer.getChannelData(1);
+        for (let i = 0; i < rainBufferSize; i++) {
+          rL[i] = (Math.random() * 2 - 1) * 0.2;
+          rR[i] = (Math.random() * 2 - 1) * 0.2;
+        }
+        const rainSource = ctx.createBufferSource();
+        rainSource.buffer = rainBuffer;
+        const rainFilter = ctx.createBiquadFilter();
+        rainFilter.type = 'bandpass';
+        rainFilter.frequency.setValueAtTime(1600, ctx.currentTime);
+        rainFilter.Q.setValueAtTime(0.6, ctx.currentTime);
+
+        const rainGain = ctx.createGain();
+        rainGain.gain.setValueAtTime(0.01, ctx.currentTime);
+        rainGain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.15);
+        rainGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining);
+
+        rainSource.connect(rainFilter);
+        rainFilter.connect(rainGain);
+        rainGain.connect(ctx.destination);
+        rainSource.start();
+        rainSource.stop(ctx.currentTime + remaining);
+
+        // 2. Thunderclap & Rolling Rumble Layer
+        const thunderBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const thunderBuffer = ctx.createBuffer(2, thunderBufferSize, ctx.sampleRate);
+        const tL = thunderBuffer.getChannelData(0);
+        const tR = thunderBuffer.getChannelData(1);
+        let l0 = 0, l1 = 0, l2 = 0;
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < thunderBufferSize; i++) {
+          const wL = Math.random() * 2 - 1;
+          const wR = Math.random() * 2 - 1;
+          l0 = 0.994 * l0 + wL * 0.05;
+          l1 = 0.96 * l1 + wL * 0.1;
+          l2 = 0.86 * l2 + wL * 0.25;
+          tL[i] = (l0 + l1 + l2) * 0.55;
+
+          b0 = 0.994 * b0 + wR * 0.05;
+          b1 = 0.96 * b1 + wR * 0.1;
+          b2 = 0.86 * b2 + wR * 0.25;
+          tR[i] = (b0 + b1 + b2) * 0.55;
+        }
+
+        const thunderSource = ctx.createBufferSource();
+        thunderSource.buffer = thunderBuffer;
+
+        const thunderFilter = ctx.createBiquadFilter();
+        thunderFilter.type = 'lowpass';
+        thunderFilter.frequency.setValueAtTime(Math.max(40, 360 - startOffset * 40), ctx.currentTime);
+        thunderFilter.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + remaining);
+
+        const thunderGain = ctx.createGain();
+        if (startOffset <= 0.1) {
+          thunderGain.gain.setValueAtTime(0.01, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.95, ctx.currentTime + 0.05); // Strike
+          thunderGain.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 0.25);
+          thunderGain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 0.55); // Loud clap
+          thunderGain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 1.2);
+          thunderGain.gain.linearRampToValueAtTime(0.65, ctx.currentTime + 1.9); // Secondary rumble at switch
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 3.5);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        } else {
+          thunderGain.gain.setValueAtTime(0.65, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.3);
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 1.8);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        }
+
+        thunderSource.connect(thunderFilter);
+        thunderFilter.connect(thunderGain);
+        thunderGain.connect(ctx.destination);
+        thunderSource.start();
+        thunderSource.stop(ctx.currentTime + remaining);
+      } catch(e) {}
+    }
+
+    // 2s / 3s ratio: 2000ms storm before navigation redirect, 3000ms storm remaining on incoming page
+    document.querySelectorAll('a[href]').forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && !href.startsWith('http') && !href.startsWith('#') && !link.hasAttribute('target')) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          sessionStorage.setItem('ern_storm_start', Date.now());
+          triggerStormVisuals(5000);
+          playThunderstormAudio(0);
+          setTimeout(() => {
+            window.location.href = href;
+          }, 2000);
+        });
+      }
+    });
+
+    (function checkStormResume() {
+      const start = sessionStorage.getItem('ern_storm_start');
+      if (start) {
+        const elapsed = (Date.now() - parseInt(start, 10)) / 1000;
+        sessionStorage.removeItem('ern_storm_start');
+        if (elapsed < 4.8) {
+          const remainingMs = Math.max(500, Math.floor((5.0 - elapsed) * 1000));
+          triggerStormVisuals(remainingMs);
+          playThunderstormAudio(elapsed);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

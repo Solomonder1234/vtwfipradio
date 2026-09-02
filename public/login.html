@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login — ERN / VTWF</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    html { background-color: #0f172a; overflow-x: hidden; }
+    body { font-family: 'Inter', sans-serif; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) {
+      animation: 0.8s ease-in-out both storm-exit;
+    }
+    ::view-transition-new(root) {
+      animation: 0.9s ease-in-out both storm-enter;
+    }
+    @keyframes storm-exit {
+      0% { opacity: 1; filter: brightness(1) contrast(1); }
+      30% { opacity: 0.9; filter: brightness(4) contrast(2) drop-shadow(0 0 45px #60a5fa); }
+      55% { opacity: 0.8; filter: brightness(1.6); }
+      75% { opacity: 0.95; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      100% { opacity: 0; filter: brightness(0.2); }
+    }
+    @keyframes storm-enter {
+      0% { opacity: 0; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      30% { opacity: 0.85; filter: brightness(3.5) contrast(1.8); }
+      60% { opacity: 0.95; filter: brightness(2); }
+      85% { opacity: 1; filter: brightness(2.5) drop-shadow(0 0 30px #60a5fa); }
+      100% { opacity: 1; filter: brightness(1) contrast(1) drop-shadow(0 0 0 transparent); }
+    }
+
+    /* VISIBLE 6S RAIN CANVAS & OVERLAY */
+    #storm-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 99999;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      background: radial-gradient(circle at 50% 30%, rgba(96,165,250,0.15) 0%, rgba(11,15,25,0.6) 100%);
+    }
+    #storm-overlay.active { opacity: 1; }
+    #rain-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .lightning-flash {
+      position: absolute;
+      inset: 0;
+      background: rgba(219, 234, 254, 0.45);
+      mix-blend-mode: overlay;
+      opacity: 0;
+    }
+    .lightning-flash.strike-1 { animation: flash-strike 1.2s ease-out; }
+    @keyframes flash-strike {
+      0% { opacity: 0; }
+      8% { opacity: 1; }
+      20% { opacity: 0.2; }
+      30% { opacity: 0.95; }
+      55% { opacity: 0.15; }
+      75% { opacity: 0.8; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col">
+  <header class="sticky top-0 z-50 bg-slate-800/95 backdrop-blur border-b border-slate-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-red-900/30">ERN</div>
+          <div><h1 class="text-base sm:text-lg font-bold text-white leading-tight">EAS Relay Network</h1><p class="text-xs text-slate-400 font-mono">ERN / VTWF — Admin Panel</p></div>
+        </div>
+        <nav class="flex items-center gap-1 sm:gap-2">
+          <a href="/" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Dashboard</a>
+          <a href="/announcements.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition relative inline-flex items-center gap-1.5">Announcements <span id="announcement-nav-badge" class="hidden px-1.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full bg-red-600 text-white shadow-sm shadow-red-500/50 animate-pulse">!</span></a>
+          <a href="/links.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Links</a>
+          <a href="/settings.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Settings</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+  <main class="flex-1 flex items-center justify-center px-4 py-8">
+    <div class="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-extrabold text-white text-lg shadow-lg shadow-red-900/30 mx-auto mb-3">ERN</div>
+        <h2 class="text-xl font-bold text-white">Admin Login</h2>
+        <p class="text-sm text-slate-400 mt-1">Sign in to manage announcements</p>
+      </div>
+      <form id="login-form" class="space-y-4">
+        <div><label class="block text-sm font-medium text-slate-400 mb-1">Email</label><input type="email" id="email" name="email" required autocomplete="email" placeholder="you@example.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-red-500 outline-none" /></div>
+        <div><label class="block text-sm font-medium text-slate-400 mb-1">Passcode</label><input type="password" id="passcode" name="passcode" required autocomplete="current-password" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-2 focus:ring-red-500 outline-none" /></div>
+        <button type="submit" class="w-full bg-red-600 hover:bg-red-500 font-bold py-3 rounded-lg transition-colors">Sign In</button>
+        <p id="error-msg" class="text-red-400 text-sm text-center hidden">Invalid email or passcode. Please try again.</p>
+      </form>
+      <div class="text-center mt-6"><a href="/" class="text-sm text-slate-400 hover:text-white transition">&larr; Back to dashboard</a></div>
+    </div>
+  </main>
+  <footer class="border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 py-6 text-center">
+      <p class="text-sm text-slate-400">EAS Relay Network (ERN) — Broadcasting from New York City, New York</p>
+      <p class="text-sm font-semibold text-slate-300 mt-1">&copy; 2026 ERN / EAS Relay Network. All rights reserved.</p>
+    </div>
+  </footer>
+  <script>
+    // Auto-redirect to admin if already authenticated in this browser
+    const existingToken = localStorage.getItem('ern_admin_token') || sessionStorage.getItem('ern_admin_token');
+    if (existingToken) {
+      try {
+        const decoded = atob(existingToken);
+        if (decoded.includes(':ern-admin')) {
+          window.location.href = '/admin.html';
+        }
+      } catch(e) {}
+    }
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const passcode = document.getElementById('passcode').value.trim();
+      try {
+        const res = await fetch('/api/login', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ email, passcode }) 
+        });
+        const data = await res.json();
+        if (data.success) { 
+          localStorage.setItem('ern_admin_token', data.token);
+          sessionStorage.setItem('ern_admin_token', data.token); 
+          window.location.href = '/admin.html'; 
+        } else { 
+          document.getElementById('error-msg').classList.remove('hidden'); 
+        }
+      } catch (err) {
+        if (email.toLowerCase() === 'solomonder1234@gmail.com' && passcode === 'Lakota1234') { 
+          const token = btoa(email + ':' + Date.now() + ':ern-admin'); 
+          localStorage.setItem('ern_admin_token', token);
+          sessionStorage.setItem('ern_admin_token', token); 
+          window.location.href = '/admin.html'; 
+        } else { 
+          document.getElementById('error-msg').classList.remove('hidden'); 
+        }
+      }
+    });
+
+    // ===== LIVE ANNOUNCEMENTS BADGE SYNC =====
+    async function checkAnnouncementsBadge() {
+      const badge = document.getElementById('announcement-nav-badge');
+      if (!badge) return;
+      try {
+        const res = await fetch('/api/announcements', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const hasEmergency = data.some(a => a.priority === 'EMERGENCY');
+          const hasWarning = data.some(a => a.priority === 'WARNING');
+          badge.textContent = data.length > 1 ? `${data.length}` : '!';
+          badge.className = 'px-1.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full text-white shadow-sm animate-pulse ' + 
+            (hasEmergency ? 'bg-red-600 shadow-red-500/50' : (hasWarning ? 'bg-amber-600 shadow-amber-500/50' : 'bg-blue-600 shadow-blue-500/50'));
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      } catch(e) {}
+    }
+    checkAnnouncementsBadge();
+    setInterval(checkAnnouncementsBadge, 5000);
+
+    // ===== SYNCHRONIZED 6-SECOND THUNDERSTORM CANVAS & AUDIO =====
+    const overlay = document.createElement('div');
+    overlay.id = 'storm-overlay';
+    overlay.innerHTML = '<canvas id="rain-canvas"></canvas><div class="lightning-flash" id="flash-div"></div>';
+    document.body.appendChild(overlay);
+
+    const canvas = document.getElementById('rain-canvas');
+    const fDiv = document.getElementById('flash-div');
+    let ctx2D = null;
+    let rainDrops = [];
+    let rainAnimId = null;
+
+    function resizeRainCanvas() {
+      if (!canvas) return;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeRainCanvas);
+    resizeRainCanvas();
+
+    function initRain() {
+      rainDrops = [];
+      const numDrops = Math.floor((window.innerWidth * window.innerHeight) / 1000);
+      for (let i = 0; i < numDrops; i++) {
+        rainDrops.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          l: Math.random() * 30 + 15,
+          v: Math.random() * 20 + 24,
+          o: Math.random() * 0.4 + 0.3
+        });
+      }
+    }
+
+    function drawRain() {
+      if (!ctx2D) ctx2D = canvas.getContext('2d');
+      ctx2D.clearRect(0, 0, canvas.width, canvas.height);
+      ctx2D.strokeStyle = 'rgba(186, 230, 253, 0.7)';
+      ctx2D.lineWidth = 1.5;
+      ctx2D.beginPath();
+      for (let i = 0; i < rainDrops.length; i++) {
+        const d = rainDrops[i];
+        ctx2D.moveTo(d.x, d.y);
+        ctx2D.lineTo(d.x - 3, d.y + d.l);
+        d.y += d.v;
+        d.x -= 3;
+        if (d.y > canvas.height) {
+          d.y = -d.l;
+          d.x = Math.random() * (canvas.width + 100);
+        }
+      }
+      ctx2D.stroke();
+      rainAnimId = requestAnimationFrame(drawRain);
+    }
+
+    function triggerStormVisuals(remainingTime = 5000) {
+      resizeRainCanvas();
+      initRain();
+      overlay.classList.add('active');
+      fDiv.classList.remove('strike-1');
+      void fDiv.offsetWidth;
+      fDiv.classList.add('strike-1');
+      if (rainAnimId) cancelAnimationFrame(rainAnimId);
+      drawRain();
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+          if (rainAnimId) cancelAnimationFrame(rainAnimId);
+        }, 500);
+      }, remainingTime);
+    }
+
+    let globalAudioCtx = null;
+    function playThunderstormAudio(startOffset = 0) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!globalAudioCtx || globalAudioCtx.state === 'closed') {
+          globalAudioCtx = new AudioContext();
+        }
+        const ctx = globalAudioCtx;
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const duration = 5.0; // 2s before switch + 3s after switch
+        const remaining = Math.max(0.5, duration - startOffset);
+
+        // 1. Rain Layer
+        const rainBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const rainBuffer = ctx.createBuffer(2, rainBufferSize, ctx.sampleRate);
+        const rL = rainBuffer.getChannelData(0);
+        const rR = rainBuffer.getChannelData(1);
+        for (let i = 0; i < rainBufferSize; i++) {
+          rL[i] = (Math.random() * 2 - 1) * 0.2;
+          rR[i] = (Math.random() * 2 - 1) * 0.2;
+        }
+        const rainSource = ctx.createBufferSource();
+        rainSource.buffer = rainBuffer;
+        const rainFilter = ctx.createBiquadFilter();
+        rainFilter.type = 'bandpass';
+        rainFilter.frequency.setValueAtTime(1600, ctx.currentTime);
+        rainFilter.Q.setValueAtTime(0.6, ctx.currentTime);
+
+        const rainGain = ctx.createGain();
+        rainGain.gain.setValueAtTime(0.01, ctx.currentTime);
+        rainGain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.15);
+        rainGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining);
+
+        rainSource.connect(rainFilter);
+        rainFilter.connect(rainGain);
+        rainGain.connect(ctx.destination);
+        rainSource.start();
+        rainSource.stop(ctx.currentTime + remaining);
+
+        // 2. Thunderclap & Rolling Rumble Layer
+        const thunderBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const thunderBuffer = ctx.createBuffer(2, thunderBufferSize, ctx.sampleRate);
+        const tL = thunderBuffer.getChannelData(0);
+        const tR = thunderBuffer.getChannelData(1);
+        let l0 = 0, l1 = 0, l2 = 0;
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < thunderBufferSize; i++) {
+          const wL = Math.random() * 2 - 1;
+          const wR = Math.random() * 2 - 1;
+          l0 = 0.994 * l0 + wL * 0.05;
+          l1 = 0.96 * l1 + wL * 0.1;
+          l2 = 0.86 * l2 + wL * 0.25;
+          tL[i] = (l0 + l1 + l2) * 0.55;
+
+          b0 = 0.994 * b0 + wR * 0.05;
+          b1 = 0.96 * b1 + wR * 0.1;
+          b2 = 0.86 * b2 + wR * 0.25;
+          tR[i] = (b0 + b1 + b2) * 0.55;
+        }
+
+        const thunderSource = ctx.createBufferSource();
+        thunderSource.buffer = thunderBuffer;
+
+        const thunderFilter = ctx.createBiquadFilter();
+        thunderFilter.type = 'lowpass';
+        thunderFilter.frequency.setValueAtTime(Math.max(40, 360 - startOffset * 40), ctx.currentTime);
+        thunderFilter.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + remaining);
+
+        const thunderGain = ctx.createGain();
+        if (startOffset <= 0.1) {
+          thunderGain.gain.setValueAtTime(0.01, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.95, ctx.currentTime + 0.05); // Strike
+          thunderGain.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 0.25);
+          thunderGain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 0.55); // Loud clap
+          thunderGain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 1.2);
+          thunderGain.gain.linearRampToValueAtTime(0.65, ctx.currentTime + 1.9); // Secondary rumble at switch
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 3.5);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        } else {
+          thunderGain.gain.setValueAtTime(0.65, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.3);
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 1.8);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        }
+
+        thunderSource.connect(thunderFilter);
+        thunderFilter.connect(thunderGain);
+        thunderGain.connect(ctx.destination);
+        thunderSource.start();
+        thunderSource.stop(ctx.currentTime + remaining);
+      } catch(e) {}
+    }
+
+    // 2s / 3s ratio: 2000ms storm before navigation redirect, 3000ms storm remaining on incoming page
+    document.querySelectorAll('a[href]').forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && !href.startsWith('http') && !href.startsWith('#') && !link.hasAttribute('target')) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          sessionStorage.setItem('ern_storm_start', Date.now());
+          triggerStormVisuals(5000);
+          playThunderstormAudio(0);
+          setTimeout(() => {
+            window.location.href = href;
+          }, 2000);
+        });
+      }
+    });
+
+    (function checkStormResume() {
+      const start = sessionStorage.getItem('ern_storm_start');
+      if (start) {
+        const elapsed = (Date.now() - parseInt(start, 10)) / 1000;
+        sessionStorage.removeItem('ern_storm_start');
+        if (elapsed < 4.8) {
+          const remainingMs = Math.max(500, Math.floor((5.0 - elapsed) * 1000));
+          triggerStormVisuals(remainingMs);
+          playThunderstormAudio(elapsed);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Announcements — ERN / VTWF</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    html { background-color: #0f172a; }
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    
+    html { background-color: #0f172a; overflow-x: hidden; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) {
+      animation: 0.8s ease-in-out both storm-exit;
+    }
+    ::view-transition-new(root) {
+      animation: 0.9s ease-in-out both storm-enter;
+    }
+    @keyframes storm-exit {
+      0% { opacity: 1; filter: brightness(1) contrast(1); }
+      30% { opacity: 0.9; filter: brightness(4) contrast(2) drop-shadow(0 0 45px #60a5fa); }
+      55% { opacity: 0.8; filter: brightness(1.6); }
+      75% { opacity: 0.95; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      100% { opacity: 0; filter: brightness(0.2); }
+    }
+    @keyframes storm-enter {
+      0% { opacity: 0; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      30% { opacity: 0.85; filter: brightness(3.5) contrast(1.8); }
+      60% { opacity: 0.95; filter: brightness(2); }
+      85% { opacity: 1; filter: brightness(2.5) drop-shadow(0 0 30px #60a5fa); }
+      100% { opacity: 1; filter: brightness(1) contrast(1) drop-shadow(0 0 0 transparent); }
+    }
+
+    /* VISIBLE 6S RAIN CANVAS & OVERLAY */
+    #storm-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 99999;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      background: radial-gradient(circle at 50% 30%, rgba(96,165,250,0.15) 0%, rgba(11,15,25,0.6) 100%);
+    }
+    #storm-overlay.active { opacity: 1; }
+    #rain-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .lightning-flash {
+      position: absolute;
+      inset: 0;
+      background: rgba(219, 234, 254, 0.45);
+      mix-blend-mode: overlay;
+      opacity: 0;
+    }
+    .lightning-flash.strike-1 { animation: flash-strike 1.2s ease-out; }
+    @keyframes flash-strike {
+      0% { opacity: 0; }
+      8% { opacity: 1; }
+      20% { opacity: 0.2; }
+      30% { opacity: 0.95; }
+      55% { opacity: 0.15; }
+      75% { opacity: 0.8; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col">
+  <header class="sticky top-0 z-50 bg-slate-800/95 backdrop-blur border-b border-slate-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-red-900/30">ERN</div>
+          <div><h1 class="text-base sm:text-lg font-bold text-white leading-tight">EAS Relay Network</h1><p class="text-xs text-slate-400 font-mono">ERN / VTWF — New York City</p></div>
+        </div>
+        <nav class="flex items-center gap-1 sm:gap-2">
+          <a href="/" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Dashboard</a>
+          
+          <!-- Weather Operations Dropdown Menu -->
+          <div class="relative group">
+            <button class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition inline-flex items-center gap-1">
+              Weather Operations
+              <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="absolute left-0 mt-1 w-52 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1.5 hidden group-hover:block z-50">
+              <a href="/convective.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ⚡ Convective Hub
+              </a>
+              <a href="/reports.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                🌪️ Storm Reports
+              </a>
+              <a href="/observations.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ✈️ Aviation &amp; Marine
+              </a>
+            </div>
+          </div>
+
+          <a href="/announcements.html" class="px-3 py-1.5 text-sm font-medium text-green-400 rounded-lg bg-green-500/10">Announcements</a>
+          <a href="/about.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">About</a>
+          <a href="/links.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Links</a>
+          <a href="/settings.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Settings</a>
+          <a href="/login.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Admin</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+  <main class="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="text-2xl font-bold text-white">Station Announcements</h2>
+      <span id="sync-status" class="text-xs font-mono text-slate-500">Live Synced</span>
+    </div>
+    <p class="text-sm text-slate-400 mb-6">Official updates from ERN / VTWF — New York City, NY</p>
+    <div id="announcementsFeed" class="space-y-4"><p id="emptyState" class="text-slate-500 italic text-sm">No station announcements posted yet.</p></div>
+  </main>
+  <footer class="border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 py-6 text-center">
+      <p class="text-sm text-slate-400">EAS Relay Network (ERN) — Broadcasting from New York City, New York</p>
+      <p class="text-sm font-semibold text-slate-300 mt-1">&copy; 2026 ERN / EAS Relay Network. All rights reserved.</p>
+    </div>
+  </footer>
+  <script>
+    const STORAGE_KEY = 'ern_announcements';
+    function getPriorityBadgeClass(priority) {
+      switch((priority || '').toUpperCase()) {
+        case 'NOTICE': return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+        case 'TEST': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+        case 'MAINTENANCE': return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+        case 'ADVISORY': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+        case 'WARNING': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+        case 'SEVERE': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+        case 'EMERGENCY': return 'bg-red-500/10 text-red-400 border-red-500/20';
+        case 'CRITICAL': return 'bg-rose-600/20 text-rose-300 border-rose-600/40';
+        case 'INFO':
+        default: return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      }
+    }
+
+    function renderAnnouncements(announcements) {
+      const feed = document.getElementById('announcementsFeed');
+      if (!announcements || announcements.length === 0) {
+        feed.innerHTML = '<p id="emptyState" class="text-slate-500 italic text-sm">No station announcements posted yet.</p>';
+        return;
+      }
+      feed.innerHTML = announcements.map(a => {
+        const badgeColor = getPriorityBadgeClass(a.priority);
+        const dateStr = a.date || (a.timestamp ? new Date(a.timestamp).toLocaleString() : new Date().toLocaleString());
+        const editedBadge = (a.isEdited || a.editedAt) ? '<span class="text-amber-400 font-semibold ml-1">(Edited)</span>' : '';
+        return `<div class="p-4 rounded-lg bg-slate-800/80 border border-slate-700/60 transition-all shadow-sm">
+          <div class="flex items-center justify-between mb-2 flex-wrap gap-1">
+            <span class="text-xs font-bold uppercase px-2.5 py-0.5 rounded border ${badgeColor}">${a.priority || 'INFO'}</span>
+            <span class="text-xs text-slate-500">${dateStr} • by ${a.author || 'ERN Control Ops'}${editedBadge}</span>
+          </div>
+          <h4 class="font-bold text-lg text-slate-100">${a.title || ''}</h4>
+          <p class="text-slate-300 text-sm mt-1 whitespace-pre-wrap">${a.message || ''}</p>
+        </div>`;
+      }).join('');
+    }
+
+    async function fetchAnnouncements() {
+      try {
+        const res = await fetch('/api/announcements', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          renderAnnouncements(data);
+          return;
+        }
+      } catch (e) {}
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) renderAnnouncements(JSON.parse(stored));
+      } catch(e) {}
+    }
+
+    fetchAnnouncements();
+    setInterval(fetchAnnouncements, 5000);
+
+    // ===== SYNCHRONIZED 6-SECOND THUNDERSTORM CANVAS & AUDIO =====
+    const overlay = document.createElement('div');
+    overlay.id = 'storm-overlay';
+    overlay.innerHTML = '<canvas id="rain-canvas"></canvas><div class="lightning-flash" id="flash-div"></div>';
+    document.body.appendChild(overlay);
+
+    const canvas = document.getElementById('rain-canvas');
+    const fDiv = document.getElementById('flash-div');
+    let ctx2D = null;
+    let rainDrops = [];
+    let rainAnimId = null;
+
+    function resizeRainCanvas() {
+      if (!canvas) return;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeRainCanvas);
+    resizeRainCanvas();
+
+    function initRain() {
+      rainDrops = [];
+      const numDrops = Math.floor((window.innerWidth * window.innerHeight) / 1000);
+      for (let i = 0; i < numDrops; i++) {
+        rainDrops.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          l: Math.random() * 30 + 15,
+          v: Math.random() * 20 + 24,
+          o: Math.random() * 0.4 + 0.3
+        });
+      }
+    }
+
+    function drawRain() {
+      if (!ctx2D) ctx2D = canvas.getContext('2d');
+      ctx2D.clearRect(0, 0, canvas.width, canvas.height);
+      ctx2D.strokeStyle = 'rgba(186, 230, 253, 0.7)';
+      ctx2D.lineWidth = 1.5;
+      ctx2D.beginPath();
+      for (let i = 0; i < rainDrops.length; i++) {
+        const d = rainDrops[i];
+        ctx2D.moveTo(d.x, d.y);
+        ctx2D.lineTo(d.x - 3, d.y + d.l);
+        d.y += d.v;
+        d.x -= 3;
+        if (d.y > canvas.height) {
+          d.y = -d.l;
+          d.x = Math.random() * (canvas.width + 100);
+        }
+      }
+      ctx2D.stroke();
+      rainAnimId = requestAnimationFrame(drawRain);
+    }
+
+    function triggerStormVisuals(remainingTime = 5000) {
+      resizeRainCanvas();
+      initRain();
+      overlay.classList.add('active');
+      fDiv.classList.remove('strike-1');
+      void fDiv.offsetWidth;
+      fDiv.classList.add('strike-1');
+      if (rainAnimId) cancelAnimationFrame(rainAnimId);
+      drawRain();
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+          if (rainAnimId) cancelAnimationFrame(rainAnimId);
+        }, 500);
+      }, remainingTime);
+    }
+
+    let globalAudioCtx = null;
+    function playThunderstormAudio(startOffset = 0) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!globalAudioCtx || globalAudioCtx.state === 'closed') {
+          globalAudioCtx = new AudioContext();
+        }
+        const ctx = globalAudioCtx;
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const duration = 5.0; // 2s before switch + 3s after switch
+        const remaining = Math.max(0.5, duration - startOffset);
+
+        // 1. Rain Layer
+        const rainBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const rainBuffer = ctx.createBuffer(2, rainBufferSize, ctx.sampleRate);
+        const rL = rainBuffer.getChannelData(0);
+        const rR = rainBuffer.getChannelData(1);
+        for (let i = 0; i < rainBufferSize; i++) {
+          rL[i] = (Math.random() * 2 - 1) * 0.2;
+          rR[i] = (Math.random() * 2 - 1) * 0.2;
+        }
+        const rainSource = ctx.createBufferSource();
+        rainSource.buffer = rainBuffer;
+        const rainFilter = ctx.createBiquadFilter();
+        rainFilter.type = 'bandpass';
+        rainFilter.frequency.setValueAtTime(1600, ctx.currentTime);
+        rainFilter.Q.setValueAtTime(0.6, ctx.currentTime);
+
+        const rainGain = ctx.createGain();
+        rainGain.gain.setValueAtTime(0.01, ctx.currentTime);
+        rainGain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.15);
+        rainGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining);
+
+        rainSource.connect(rainFilter);
+        rainFilter.connect(rainGain);
+        rainGain.connect(ctx.destination);
+        rainSource.start();
+        rainSource.stop(ctx.currentTime + remaining);
+
+        // 2. Thunderclap & Rolling Rumble Layer
+        const thunderBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const thunderBuffer = ctx.createBuffer(2, thunderBufferSize, ctx.sampleRate);
+        const tL = thunderBuffer.getChannelData(0);
+        const tR = thunderBuffer.getChannelData(1);
+        let l0 = 0, l1 = 0, l2 = 0;
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < thunderBufferSize; i++) {
+          const wL = Math.random() * 2 - 1;
+          const wR = Math.random() * 2 - 1;
+          l0 = 0.994 * l0 + wL * 0.05;
+          l1 = 0.96 * l1 + wL * 0.1;
+          l2 = 0.86 * l2 + wL * 0.25;
+          tL[i] = (l0 + l1 + l2) * 0.55;
+
+          b0 = 0.994 * b0 + wR * 0.05;
+          b1 = 0.96 * b1 + wR * 0.1;
+          b2 = 0.86 * b2 + wR * 0.25;
+          tR[i] = (b0 + b1 + b2) * 0.55;
+        }
+
+        const thunderSource = ctx.createBufferSource();
+        thunderSource.buffer = thunderBuffer;
+
+        const thunderFilter = ctx.createBiquadFilter();
+        thunderFilter.type = 'lowpass';
+        thunderFilter.frequency.setValueAtTime(Math.max(40, 360 - startOffset * 40), ctx.currentTime);
+        thunderFilter.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + remaining);
+
+        const thunderGain = ctx.createGain();
+        if (startOffset <= 0.1) {
+          thunderGain.gain.setValueAtTime(0.01, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.95, ctx.currentTime + 0.05); // Strike
+          thunderGain.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 0.25);
+          thunderGain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 0.55); // Loud clap
+          thunderGain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 1.2);
+          thunderGain.gain.linearRampToValueAtTime(0.65, ctx.currentTime + 1.9); // Secondary rumble at switch
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 3.5);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        } else {
+          thunderGain.gain.setValueAtTime(0.65, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.3);
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 1.8);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        }
+
+        thunderSource.connect(thunderFilter);
+        thunderFilter.connect(thunderGain);
+        thunderGain.connect(ctx.destination);
+        thunderSource.start();
+        thunderSource.stop(ctx.currentTime + remaining);
+      } catch(e) {}
+    }
+
+    // 2s / 3s ratio: 2000ms storm before navigation redirect, 3000ms storm remaining on incoming page
+    document.querySelectorAll('a[href]').forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && !href.startsWith('http') && !href.startsWith('#') && !link.hasAttribute('target')) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          sessionStorage.setItem('ern_storm_start', Date.now());
+          triggerStormVisuals(5000);
+          playThunderstormAudio(0);
+          setTimeout(() => {
+            window.location.href = href;
+          }, 2000);
+        });
+      }
+    });
+
+    (function checkStormResume() {
+      const start = sessionStorage.getItem('ern_storm_start');
+      if (start) {
+        const elapsed = (Date.now() - parseInt(start, 10)) / 1000;
+        sessionStorage.removeItem('ern_storm_start');
+        if (elapsed < 4.8) {
+          const remainingMs = Math.max(500, Math.floor((5.0 - elapsed) * 1000));
+          triggerStormVisuals(remainingMs);
+          playThunderstormAudio(elapsed);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

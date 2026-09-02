@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aviation & Marine Observations Deck — ERN / VTWF</title>
+  <meta name="description" content="NYC Metro aviation METAR flight categories and offshore marine buoy observations." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'ern-dark': '#0f172a',
+            'ern-surface': '#1e293b',
+            'ern-border': '#334155',
+            'ern-green': '#22c55e',
+            'ern-amber': '#f59e0b',
+            'ern-red': '#ef4444',
+          },
+          fontFamily: { 'mono': ['JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .scanline { background: repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px); }
+  </style>
+</head>
+<body class="bg-ern-dark text-slate-200 min-h-screen">
+  <header class="sticky top-0 z-50 bg-ern-surface/95 backdrop-blur border-b border-ern-border scanline">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-ern-red to-red-700 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-red-900/30">ERN</div>
+          <div>
+            <h1 class="text-base sm:text-lg font-bold text-white leading-tight">Aviation &amp; Marine Deck</h1>
+            <p class="text-xs text-slate-400 font-mono">NWS / NDBC Telemetry &amp; Offshore Buoy Array</p>
+          </div>
+        </div>
+        <nav class="flex items-center gap-1 sm:gap-2">
+          <a href="/" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Dashboard</a>
+          
+          <!-- Weather Operations Dropdown Menu -->
+          <div class="relative group">
+            <button class="px-3 py-1.5 text-sm font-medium text-ern-green rounded-lg bg-ern-green/10 inline-flex items-center gap-1">
+              Weather Operations
+              <svg class="w-3.5 h-3.5 text-ern-green group-hover:text-white transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="absolute left-0 mt-1 w-52 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1.5 hidden group-hover:block z-50">
+              <a href="/convective.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ⚡ Convective Hub
+              </a>
+              <a href="/reports.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                🌪️ Storm Reports
+              </a>
+              <a href="/observations.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-emerald-400 bg-slate-800/80 transition">
+                ✈️ Aviation &amp; Marine (Active)
+              </a>
+            </div>
+          </div>
+
+          <a href="/announcements.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Announcements</a>
+          <a href="/about.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">About</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <!-- Section 1: NYC Metro Aviation METARs & Flight Rules Table (api.weather.gov) -->
+    <section class="bg-ern-surface rounded-2xl border border-ern-border p-5 shadow-xl">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-ern-border flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-sky-400 animate-pulse"></span>
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">NYC Metro Airport Flight Categories (NWS METAR)</h2>
+        </div>
+        <div class="flex items-center gap-2 text-[10px] font-mono">
+          <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">VFR (>3k ft / >5 SM)</span>
+          <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 font-bold">MVFR (1k-3k ft / 3-5 SM)</span>
+          <span class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 font-bold">IFR (500-1k ft / 1-3 SM)</span>
+          <span class="px-2 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 font-bold">LIFR (&lt;500 ft / &lt;1 SM)</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs font-mono">
+          <thead class="bg-slate-900/90 text-slate-400 border-b border-slate-800 uppercase text-[11px]">
+            <tr>
+              <th class="p-3">Airport / ICAO</th>
+              <th class="p-3">Flight Rule</th>
+              <th class="p-3">Wind / Gust</th>
+              <th class="p-3">Visibility</th>
+              <th class="p-3">Ceiling / Clouds</th>
+              <th class="p-3">Temp / Dew</th>
+              <th class="p-3">Altimeter</th>
+              <th class="p-3">Raw METAR</th>
+            </tr>
+          </thead>
+          <tbody id="metar-table-body" class="divide-y divide-slate-800/60 bg-slate-950/40">
+            <tr>
+              <td colspan="8" class="p-6 text-center text-slate-500">Querying NWS API METAR observations...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section 2: Offshore Buoy Telemetry (NDBC Array via IEM GeoJSON) -->
+    <section class="bg-ern-surface rounded-2xl border border-ern-border p-5 shadow-xl">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-ern-border flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-cyan-400"></span>
+          <h2 class="text-sm font-bold text-white uppercase tracking-wider font-mono">Offshore Marine Buoy Telemetry (NDBC Array)</h2>
+        </div>
+        <span class="text-xs text-slate-400 font-mono">NOAA National Data Buoy Center Array</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5" id="buoy-cards-container">
+        <!-- Buoy 44065 -->
+        <div class="bg-slate-900/80 rounded-xl border border-slate-700/70 p-4 shadow space-y-3" id="card-buoy-44065">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <div>
+              <span class="text-xs font-bold text-cyan-400 font-mono">STATION 44065</span>
+              <p class="text-[11px] text-slate-400 font-mono">New York Harbor Entrance</p>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">15 NM SE of Breezy Pt</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Wave Height</span><strong class="text-white text-sm" id="buoy-44065-wvht">--</strong></div>
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Dominant Period</span><strong class="text-white text-sm" id="buoy-44065-dpd">--</strong></div>
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Water Temp</span><strong class="text-white text-sm" id="buoy-44065-wtmp">--</strong></div>
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Wind / Gust</span><strong class="text-white text-sm" id="buoy-44065-wind">--</strong></div>
+          </div>
+          <div class="text-[10px] text-slate-500 font-mono flex items-center justify-between">
+            <span id="buoy-44065-time">Updated: Loading...</span>
+            <a href="https://www.ndbc.noaa.gov/station_page.php?station=44065" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline">NDBC Detail ↗</a>
+          </div>
+        </div>
+
+        <!-- Buoy 44017 -->
+        <div class="bg-slate-900/80 rounded-xl border border-slate-700/70 p-4 shadow space-y-3" id="card-buoy-44017">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <div>
+              <span class="text-xs font-bold text-cyan-400 font-mono">STATION 44017</span>
+              <p class="text-[11px] text-slate-400 font-mono">Montauk Point, NY</p>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">23 NM SSW Montauk</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Wave Height</span><strong class="text-white text-sm" id="buoy-44017-wvht">--</strong></div>
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Dominant Period</span><strong class="text-white text-sm" id="buoy-44017-dpd">--</strong></div>
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Water Temp</span><strong class="text-white text-sm" id="buoy-44017-wtmp">--</strong></div>
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Wind / Gust</span><strong class="text-white text-sm" id="buoy-44017-wind">--</strong></div>
+          </div>
+          <div class="text-[10px] text-slate-500 font-mono flex items-center justify-between">
+            <span id="buoy-44017-time">Updated: Loading...</span>
+            <a href="https://www.ndbc.noaa.gov/station_page.php?station=44017" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline">NDBC Detail ↗</a>
+          </div>
+        </div>
+
+        <!-- Buoy 44025 -->
+        <div class="bg-slate-900/80 rounded-xl border border-slate-700/70 p-4 shadow space-y-3" id="card-buoy-44025">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+            <div>
+              <span class="text-xs font-bold text-cyan-400 font-mono">STATION 44025</span>
+              <p class="text-[11px] text-slate-400 font-mono">Long Island (33 NM South)</p>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">Fire Island Inlet</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Wave Height</span><strong class="text-white text-sm" id="buoy-44025-wvht">--</strong></div>
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Dominant Period</span><strong class="text-white text-sm" id="buoy-44025-dpd">--</strong></div>
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Water Temp</span><strong class="text-white text-sm" id="buoy-44025-wtmp">--</strong></div>
+            <div class="p-2 bg-slate-950/80 rounded border border-slate-800"><span class="text-slate-500 text-[10px] block">Wind / Gust</span><strong class="text-white text-sm" id="buoy-44025-wind">--</strong></div>
+          </div>
+          <div class="text-[10px] text-slate-500 font-mono flex items-center justify-between">
+            <span id="buoy-44025-time">Updated: Loading...</span>
+            <a href="https://www.ndbc.noaa.gov/station_page.php?station=44025" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline">NDBC Detail ↗</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const AIRPORTS = [
+      { id: 'KJFK', name: 'John F. Kennedy Intl' },
+      { id: 'KLGA', name: 'LaGuardia' },
+      { id: 'KEWR', name: 'Newark Liberty Intl' },
+      { id: 'KTEB', name: 'Teterboro' },
+      { id: 'KFRG', name: 'Republic / Farmingdale' },
+      { id: 'KISP', name: 'Long Island MacArthur' }
+    ];
+
+    function calculateFlightCategory(visSM, ceilingFt) {
+      const v = (visSM !== null && visSM !== undefined) ? visSM : 10;
+      const c = (ceilingFt !== null && ceilingFt !== undefined) ? ceilingFt : 25000;
+
+      if (c < 500 || v < 1) {
+        return { cat: 'LIFR', badge: 'bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/40' };
+      }
+      if (c < 1000 || v < 3) {
+        return { cat: 'IFR', badge: 'bg-red-500/20 text-red-400 border-red-500/40' };
+      }
+      if (c <= 3000 || v <= 5) {
+        return { cat: 'MVFR', badge: 'bg-blue-500/20 text-blue-400 border-blue-500/40' };
+      }
+      return { cat: 'VFR', badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' };
+    }
+
+    async function fetchMetars() {
+      const tbody = document.getElementById('metar-table-body');
+      
+      const promises = AIRPORTS.map(async (apt) => {
+        try {
+          const res = await fetch(`https://api.weather.gov/stations/${apt.id}/observations/latest`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const props = data.properties || {};
+
+          // Visibility (meters to statute miles)
+          let visSM = null;
+          if (props.visibility && props.visibility.value !== null) {
+            visSM = parseFloat((props.visibility.value / 1609.34).toFixed(1));
+          }
+
+          // Ceiling calculation (lowest BKN or OVC layer in ft)
+          let ceilingFt = null;
+          let cloudStr = 'CLR';
+          if (Array.isArray(props.cloudLayers) && props.cloudLayers.length > 0) {
+            cloudStr = props.cloudLayers.map(l => {
+              const baseFt = l.base && l.base.value !== null ? Math.round(l.base.value * 3.28084) : '';
+              if (['BKN', 'OVC'].includes(l.amount) && baseFt !== '' && (ceilingFt === null || baseFt < ceilingFt)) {
+                ceilingFt = baseFt;
+              }
+              return `${l.amount} ${baseFt ? String(baseFt).padStart(3, '0') : ''}`.trim();
+            }).join(', ');
+          }
+
+          const flt = calculateFlightCategory(visSM, ceilingFt);
+
+          // Wind & Gust (convert km/h or m/s to knots)
+          let wspdKt = 0;
+          let wgstKt = '';
+          let wdirStr = 'VRB';
+          if (props.windDirection && props.windDirection.value !== null) {
+            wdirStr = `${String(Math.round(props.windDirection.value)).padStart(3, '0')}°`;
+          }
+          if (props.windSpeed && props.windSpeed.value !== null) {
+            wspdKt = Math.round(props.windSpeed.value * 0.539957);
+          }
+          if (props.windGust && props.windGust.value !== null) {
+            wgstKt = ` G${Math.round(props.windGust.value * 0.539957)}kt`;
+          }
+
+          // Temperature & Dewpoint (Celsius to Fahrenheit)
+          let tempStr = '--';
+          if (props.temperature && props.temperature.value !== null) {
+            const c = props.temperature.value;
+            const f = Math.round(c * 9/5 + 32);
+            tempStr = `${f}°F (${c.toFixed(1)}°C)`;
+          }
+
+          // Altimeter (Pascals to inHg)
+          let altimStr = '--';
+          if (props.barometricPressure && props.barometricPressure.value !== null) {
+            altimStr = `${(props.barometricPressure.value / 3386.38867).toFixed(2)} inHg`;
+          }
+
+          const raw = props.rawMessage || `${apt.id} METAR unavailable`;
+
+          return `
+            <tr class="hover:bg-slate-900/60 transition">
+              <td class="p-3">
+                <strong class="text-white">${apt.id}</strong>
+                <span class="text-slate-400 block text-[10px] font-sans">${apt.name}</span>
+              </td>
+              <td class="p-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${flt.badge}">${flt.cat}</span>
+              </td>
+              <td class="p-3 text-slate-200">${wdirStr} @ ${wspdKt}kt${wgstKt}</td>
+              <td class="p-3 text-slate-300">${visSM !== null ? `${visSM} SM` : '10+ SM'}</td>
+              <td class="p-3 text-slate-300">${cloudStr}</td>
+              <td class="p-3 text-slate-300">${tempStr}</td>
+              <td class="p-3 text-slate-400">${altimStr}</td>
+              <td class="p-3 text-[10px] text-slate-400 font-mono select-text max-w-xs truncate" title="${raw}">${raw}</td>
+            </tr>
+          `;
+        } catch (err) {
+          return `
+            <tr class="hover:bg-slate-900/60 transition">
+              <td class="p-3"><strong class="text-white">${apt.id}</strong></td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400">UNAVAIL</span></td>
+              <td colspan="6" class="p-3 text-slate-500">Observation momentarily unavailable</td>
+            </tr>
+          `;
+        }
+      });
+
+      const rows = await Promise.all(promises);
+      tbody.innerHTML = rows.join('');
+    }
+
+    async function fetchBuoyData() {
+      try {
+        const res = await fetch(`/api/buoys?t=${Date.now()}`);
+        if (!res.ok) throw new Error("Buoy proxy request failed");
+        const buoys = await res.json();
+
+        buoys.forEach(b => {
+          const stationId = b.stationId;
+
+          // Wave Height
+          const elWvht = document.getElementById(`buoy-${stationId}-wvht`);
+          if (elWvht) elWvht.textContent = b.waveHeight || 'N/A';
+
+          // Dominant Wave Period
+          const elDpd = document.getElementById(`buoy-${stationId}-dpd`);
+          if (elDpd) elDpd.textContent = b.wavePeriod || 'N/A';
+
+          // Water Temperature
+          const elWtmp = document.getElementById(`buoy-${stationId}-wtmp`);
+          if (elWtmp) elWtmp.textContent = b.waterTemp || 'N/A';
+
+          // Wind Speed & Gust
+          const elWind = document.getElementById(`buoy-${stationId}-wind`);
+          if (elWind) elWind.textContent = b.wind || 'N/A';
+
+          // Updated Timestamp
+          const elTime = document.getElementById(`buoy-${stationId}-time`);
+          if (elTime) {
+            elTime.textContent = `Obs: ${b.timeStr || 'Recent'}`;
+          }
+        });
+      } catch (err) {
+        console.warn("NDBC buoy fetch error:", err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchMetars();
+      fetchBuoyData();
+    });
+
+    setInterval(fetchMetars, 60000);
+    setInterval(fetchBuoyData, 120000);
+  </script>
+</body>
+</html>

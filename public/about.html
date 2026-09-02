@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About ERN / VTWF — EAS Relay Network</title>
+  <meta name="description" content="About the Emergency Alert System Relay Network (ERN / VTWF) — NYC Station & Broadcast Infrastructure." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'ern-dark': '#0f172a',
+            'ern-surface': '#1e293b',
+            'ern-border': '#334155',
+            'ern-green': '#22c55e',
+            'ern-amber': '#f59e0b',
+            'ern-red': '#ef4444',
+          },
+          fontFamily: { 'mono': ['JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .scanline { background: repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px); }
+  </style>
+</head>
+<body class="bg-ern-dark text-slate-200 min-h-screen flex flex-col">
+  <header class="sticky top-0 z-50 bg-ern-surface/95 backdrop-blur border-b border-ern-border scanline">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-ern-red to-red-700 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-red-900/30">ERN</div>
+          <div><h1 class="text-base sm:text-lg font-bold text-white leading-tight">EAS Relay Network</h1><p class="text-xs text-slate-400 font-mono">ERN / VTWF &mdash; New York City</p></div>
+        </div>
+        <nav class="flex items-center gap-1 sm:gap-2">
+          <a href="/" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Dashboard</a>
+          
+          <!-- Operations Dropdown Menu -->
+          <div class="relative group">
+            <button class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition inline-flex items-center gap-1">
+              Weather Operations
+              <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="absolute left-0 mt-1 w-52 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1.5 hidden group-hover:block z-50">
+              <a href="/convective.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ⚡ Convective Hub
+              </a>
+              <a href="/reports.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                🌪️ Storm Reports
+              </a>
+              <a href="/observations.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ✈️ Aviation &amp; Marine
+              </a>
+            </div>
+          </div>
+
+          <a href="/announcements.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Announcements</a>
+          <a href="/about.html" class="px-3 py-1.5 text-sm font-medium text-ern-green rounded-lg bg-ern-green/10">About</a>
+          <a href="/links.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Links</a>
+          <a href="/settings.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Settings</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 flex-1">
+    <!-- Header Hero -->
+    <div class="bg-ern-surface rounded-2xl border border-ern-border p-6 sm:p-8 shadow-xl relative overflow-hidden">
+      <div class="relative z-10 space-y-3">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-ern-green/10 text-ern-green border border-ern-green/30">
+          <span class="w-2 h-2 rounded-full bg-ern-green animate-pulse"></span>
+          OFFICIAL STATION OVERVIEW
+        </span>
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">About EAS Relay Network (ERN / VTWF)</h2>
+        <p class="text-slate-300 text-sm sm:text-base leading-relaxed max-w-3xl">
+          The <strong>EAS Relay Network (ERN / VTWF)</strong> is a dedicated 24/7 meteorological telemetry, civil emergency alert relay, and live broadcast service serving the greater New York City metropolitan area and the national EAS community.
+        </p>
+      </div>
+    </div>
+
+    <!-- 3 Core Pillars -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-5 space-y-3 shadow-md">
+        <div class="w-10 h-10 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 text-lg">
+          🚨
+        </div>
+        <h3 class="text-base font-bold text-white font-mono">Emergency Alert System</h3>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Integrated with hardware DASDEC encoders/decoders and the GWES EAS Network. Relays live SAME/EAS warning bursts (EAN, TOR, SVR, FFW) with automated failover routing.
+        </p>
+      </div>
+
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-5 space-y-3 shadow-md">
+        <div class="w-10 h-10 rounded-lg bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 text-lg">
+          📡
+        </div>
+        <h3 class="text-base font-bold text-white font-mono">Meteorological Ingestion</h3>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Pulls multi-office NWS data (Upton/OKX &amp; Mount Holly/PHI), live NEXRAD Doppler radar loops, NOAA SPC convective outlooks, and Mesoanalysis sounding diagnostics.
+        </p>
+      </div>
+
+      <div class="bg-ern-surface rounded-xl border border-ern-border p-5 space-y-3 shadow-md">
+        <div class="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg">
+          🌊
+        </div>
+        <h3 class="text-base font-bold text-white font-mono">Aviation &amp; Marine Array</h3>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Monitors NYC metro airport METAR observations (JFK, LGA, EWR, TEB, FRG, ISP) with FAA flight categories and offshore NDBC ocean buoys (44065, 44017, 44025).
+        </p>
+      </div>
+    </div>
+
+    <!-- Technical Specifications Table -->
+    <div class="bg-ern-surface rounded-2xl border border-ern-border p-6 shadow-xl space-y-4">
+      <h3 class="text-sm font-bold text-white font-mono uppercase tracking-wider border-b border-ern-border pb-3">
+        Station Specifications &amp; Relays
+      </h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
+        <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
+          <span class="text-slate-500 block text-[10px] uppercase">Primary Call Sign</span>
+          <strong class="text-white text-sm">ERN-VTWF</strong>
+        </div>
+        <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
+          <span class="text-slate-500 block text-[10px] uppercase">Relay Affiliate</span>
+          <strong class="text-white text-sm">WJON-IP / GWES</strong>
+        </div>
+        <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
+          <span class="text-slate-500 block text-[10px] uppercase">Coverage Region</span>
+          <strong class="text-white text-sm">NYC Metro / Tri-State</strong>
+        </div>
+        <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800">
+          <span class="text-slate-500 block text-[10px] uppercase">Primary WFO Offices</span>
+          <strong class="text-white text-sm">OKX &bull; PHI</strong>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-ern-surface border-t border-ern-border mt-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
+      <p class="text-sm text-slate-400">EAS Relay Network (ERN) &mdash; Broadcasting from New York City, New York</p>
+      <p class="text-sm font-semibold text-slate-300 mt-1">&copy; 2026 ERN / EAS Relay Network. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Station Maintenance & Upgrade — ERN / VTWF</title>
+  <meta name="description" content="ERN / VTWF Station Maintenance & Hardware Upgrade." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'ern-dark': '#0f172a',
+            'ern-surface': '#1e293b',
+            'ern-border': '#334155',
+            'ern-green': '#22c55e',
+            'ern-amber': '#f59e0b',
+            'ern-red': '#ef4444',
+          },
+          fontFamily: { 'mono': ['JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .scanline { background: repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px); }
+  </style>
+</head>
+<body class="bg-ern-dark text-slate-200 min-h-screen flex flex-col items-center justify-center p-4">
+  <div class="max-w-lg w-full bg-ern-surface rounded-2xl border border-ern-border p-6 sm:p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
+    <div class="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400 text-3xl shadow-lg shadow-amber-500/20 animate-pulse">
+      🔧
+    </div>
+    
+    <div class="space-y-2">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+        STATION MAINTENANCE UNDERWAY
+      </span>
+      <h1 class="text-2xl font-extrabold text-white">Temporary System Maintenance</h1>
+      <p class="text-slate-400 text-sm leading-relaxed">
+        The <strong>ERN / VTWF Broadcast Dashboard</strong> is temporarily offline for scheduled hardware diagnostics, DASDEC upgrades, and server maintenance.
+      </p>
+    </div>
+
+    <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-left space-y-2.5 text-xs font-mono">
+      <div class="flex justify-between items-center text-slate-400">
+        <span>Station Status Page:</span>
+        <a href="https://status.listentovtwfip.org" class="text-emerald-400 hover:underline flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          Live 24/7 (Online) ↗
+        </a>
+      </div>
+      <div class="flex justify-between items-center text-slate-400">
+        <span>Primary Audio Stream:</span>
+        <a href="https://icecast.gwes-eas.network/ERN-VTWF" target="_blank" class="text-sky-400 hover:underline">Direct Link ↗</a>
+      </div>
+      <div class="flex justify-between items-center text-slate-400">
+        <span>Backup Relay Stream:</span>
+        <a href="http://radio.wjonip.org/wjonip" target="_blank" class="text-amber-400 hover:underline">WJON-IP Direct ↗</a>
+      </div>
+    </div>
+
+    <div class="pt-2">
+      <a href="https://status.listentovtwfip.org" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-white text-sm transition shadow-lg shadow-emerald-900/40">
+        View Live Status &amp; Uptime Page ↗
+      </a>
+    </div>
+
+    <p class="text-[11px] text-slate-500 font-mono">EAS Relay Network (ERN / VTWF) &bull; New York City, NY</p>
+  </div>
+</body>
+</html>

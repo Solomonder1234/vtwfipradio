@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Local Storm Reports &amp; Spotter Desk — ERN / VTWF</title>
+  <meta name="description" content="24-hour verified NWS local storm reports for New York (OKX) and Mount Holly (PHI)." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'ern-dark': '#0f172a',
+            'ern-surface': '#1e293b',
+            'ern-border': '#334155',
+            'ern-green': '#22c55e',
+            'ern-amber': '#f59e0b',
+            'ern-red': '#ef4444',
+          },
+          fontFamily: { 'mono': ['JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .scanline { background: repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px); }
+    .dark-invert-tiles {
+      filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+    }
+  </style>
+</head>
+<body class="bg-ern-dark text-slate-200 min-h-screen">
+  <header class="sticky top-0 z-50 bg-ern-surface/95 backdrop-blur border-b border-ern-border scanline">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-ern-red to-red-700 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-red-900/30">ERN</div>
+          <div>
+            <h1 class="text-base sm:text-lg font-bold text-white leading-tight">Local Storm Reports (LSR) Desk</h1>
+            <p class="text-xs text-slate-400 font-mono">24-Hour Verified Reports &bull; NWS OKX &amp; PHI</p>
+          </div>
+        </div>
+        <nav class="flex items-center gap-1 sm:gap-2">
+          <a href="/" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Dashboard</a>
+          
+          <!-- Weather Operations Dropdown Menu -->
+          <div class="relative group">
+            <button class="px-3 py-1.5 text-sm font-medium text-ern-green rounded-lg bg-ern-green/10 inline-flex items-center gap-1">
+              Weather Operations
+              <svg class="w-3.5 h-3.5 text-ern-green group-hover:text-white transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="absolute left-0 mt-1 w-52 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1.5 hidden group-hover:block z-50">
+              <a href="/convective.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ⚡ Convective Hub
+              </a>
+              <a href="/reports.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-emerald-400 bg-slate-800/80 transition">
+                🌪️ Storm Reports (Active)
+              </a>
+              <a href="/observations.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ✈️ Aviation &amp; Marine
+              </a>
+            </div>
+          </div>
+
+          <a href="/announcements.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Announcements</a>
+          <a href="/about.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">About</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+    <!-- Filter Pills Bar -->
+    <div class="flex items-center justify-between flex-wrap gap-3 bg-ern-surface p-3 rounded-xl border border-ern-border shadow">
+      <div class="flex items-center gap-2 flex-wrap" id="filter-container">
+        <button onclick="setLsrFilter('ALL')" id="flt-ALL" class="px-3 py-1 rounded-lg text-xs font-mono font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40">ALL REPORTS</button>
+        <button onclick="setLsrFilter('WIND')" id="flt-WIND" class="px-3 py-1 rounded-lg text-xs font-mono font-medium text-slate-400 hover:text-white border border-transparent">💨 WIND (58+ MPH)</button>
+        <button onclick="setLsrFilter('HAIL')" id="flt-HAIL" class="px-3 py-1 rounded-lg text-xs font-mono font-medium text-slate-400 hover:text-white border border-transparent">🧊 HAIL (1.00"+)</button>
+        <button onclick="setLsrFilter('FLOOD')" id="flt-FLOOD" class="px-3 py-1 rounded-lg text-xs font-mono font-medium text-slate-400 hover:text-white border border-transparent">🌊 FLOODING</button>
+        <button onclick="setLsrFilter('TORNADO')" id="flt-TORNADO" class="px-3 py-1 rounded-lg text-xs font-mono font-medium text-slate-400 hover:text-white border border-transparent">🌪️ TORNADO / FUNNEL</button>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-mono text-slate-400">
+        <span class="w-2 h-2 rounded-full bg-ern-green"></span>
+        <span id="report-count-badge">0 Reports (24h)</span>
+      </div>
+    </div>
+
+    <!-- Dual Layout: Left Feed, Right Leaflet Map -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-220px)] min-h-[550px]">
+      <!-- Left Column: Report Cards Feed -->
+      <div class="lg:col-span-5 bg-ern-surface rounded-2xl border border-ern-border overflow-hidden flex flex-col shadow-xl">
+        <div class="px-4 py-2.5 border-b border-ern-border bg-slate-900/60 flex items-center justify-between">
+          <span class="text-xs font-bold text-white font-mono uppercase tracking-wider">Verified Local Storm Reports</span>
+          <span class="text-[10px] font-mono text-slate-400">Click card to focus pin</span>
+        </div>
+        <div id="lsr-cards-feed" class="flex-1 p-4 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-slate-700">
+          <div class="text-center text-slate-500 text-xs font-mono italic mt-12">Loading 24-hour storm reports...</div>
+        </div>
+      </div>
+
+      <!-- Right Column: Interactive Leaflet Map -->
+      <div class="lg:col-span-7 bg-ern-surface rounded-2xl border border-ern-border overflow-hidden relative shadow-xl">
+        <div id="lsr-leaflet-map" class="w-full h-full bg-slate-950"></div>
+        <div class="absolute bottom-3 left-3 z-[400] bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-2 text-[11px] font-mono shadow-md backdrop-blur">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span><span>Wind</span>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 ml-2"></span><span>Hail</span>
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 ml-2"></span><span>Flood</span>
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500 ml-2"></span><span>Tornado</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let allReports = [];
+    let currentFilter = 'ALL';
+    let lsrMap = null;
+    let markersLayer = null;
+
+    function initMap() {
+      if (lsrMap) {
+        try {
+          lsrMap.remove();
+        } catch (e) {
+          console.warn("Map remove error:", e);
+        }
+        lsrMap = null;
+      }
+
+      lsrMap = L.map('lsr-leaflet-map').setView([40.7831, -73.9712], 8);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19,
+        className: 'dark-invert-tiles'
+      }).addTo(lsrMap);
+
+      markersLayer = L.layerGroup().addTo(lsrMap);
+
+      setTimeout(() => {
+        if (lsrMap) lsrMap.invalidateSize();
+      }, 200);
+    }
+
+    function getHazardDetails(type, mag) {
+      const t = (type || '').toUpperCase();
+      const m = parseFloat(mag) || 0;
+
+      if (t.includes('TORNADO') || t.includes('FUNNEL') || t.includes('WALL CLOUD')) {
+        return { cat: 'TORNADO', color: '#ef4444', badge: 'bg-red-500/20 text-red-400 border-red-500/30' };
+      }
+      if (t.includes('WIND') || t.includes('GUST')) {
+        return { cat: 'WIND', color: '#38bdf8', badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30' };
+      }
+      if (t.includes('HAIL')) {
+        return { cat: 'HAIL', color: '#22c55e', badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' };
+      }
+      if (t.includes('FLOOD') || t.includes('RAIN')) {
+        return { cat: 'FLOOD', color: '#f59e0b', badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30' };
+      }
+      return { cat: 'OTHER', color: '#a855f7', badge: 'bg-purple-500/20 text-purple-400 border-purple-500/30' };
+    }
+
+    function renderReports() {
+      const container = document.getElementById('lsr-cards-feed');
+      const countBadge = document.getElementById('report-count-badge');
+      if (markersLayer) markersLayer.clearLayers();
+
+      const filtered = allReports.filter(r => {
+        if (currentFilter === 'ALL') return true;
+        if (currentFilter === 'WIND') return r.hazard.cat === 'WIND';
+        if (currentFilter === 'HAIL') return r.hazard.cat === 'HAIL';
+        if (currentFilter === 'FLOOD') return r.hazard.cat === 'FLOOD';
+        if (currentFilter === 'TORNADO') return r.hazard.cat === 'TORNADO';
+        return true;
+      });
+
+      if (countBadge) {
+        countBadge.textContent = `${filtered.length} Report${filtered.length === 1 ? '' : 's'} (24h)`;
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center p-8 text-center bg-slate-900/40 rounded-xl border border-slate-800/80">
+            <div class="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-3 text-emerald-400">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="text-sm font-bold font-mono text-emerald-400 uppercase tracking-wider mb-1">✓ QUIET WEATHER ACTIVE</div>
+            <p class="text-xs text-slate-400 font-mono max-w-sm">No severe storm reports logged for NWS OKX or PHI within the last 24 hours.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map((r, idx) => `
+        <div onclick="focusReport(${r.lat}, ${r.lon}, ${idx})" class="report-card p-3 rounded-xl border border-slate-700/70 bg-slate-900/80 hover:bg-slate-800/90 hover:border-slate-500 transition cursor-pointer shadow space-y-1.5" id="card-${idx}">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${r.hazard.badge}">${r.type}</span>
+              <span class="text-xs font-bold text-white font-mono">${r.magnitude ? `${r.magnitude}` : ''}</span>
+            </div>
+            <span class="text-[10px] font-mono text-slate-400">${r.timeStr}</span>
+          </div>
+          <div class="text-xs font-bold text-slate-200 font-mono">${r.city}, ${r.county} (${r.wfo})</div>
+          <p class="text-xs text-slate-400 font-mono leading-snug select-text">${r.remark || 'No specific remarks.'}</p>
+        </div>
+      `).join('');
+
+      filtered.forEach((r, idx) => {
+        const marker = L.circleMarker([r.lat, r.lon], {
+          radius: 7,
+          fillColor: r.hazard.color,
+          color: '#ffffff',
+          weight: 1.5,
+          opacity: 1,
+          fillOpacity: 0.85
+        });
+
+        marker.bindPopup(`
+          <div class="text-xs font-mono space-y-1">
+            <div class="font-bold text-slate-900">${r.type} ${r.magnitude ? `(${r.magnitude})` : ''}</div>
+            <div class="text-slate-700 font-semibold">${r.city}, ${r.county} (${r.wfo})</div>
+            <div class="text-slate-600">${r.timeStr}</div>
+            <div class="text-slate-800 text-[11px] mt-1 italic">${r.remark || ''}</div>
+          </div>
+        `);
+
+        marker.on('click', () => {
+          document.querySelectorAll('.report-card').forEach(c => c.classList.remove('ring-2', 'ring-sky-400'));
+          const card = document.getElementById(`card-${idx}`);
+          if (card) {
+            card.classList.add('ring-2', 'ring-sky-400');
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        });
+
+        if (markersLayer) markersLayer.addLayer(marker);
+      });
+    }
+
+    function focusReport(lat, lon, idx) {
+      if (!lsrMap) return;
+      lsrMap.flyTo([lat, lon], 12);
+      document.querySelectorAll('.report-card').forEach(c => c.classList.remove('ring-2', 'ring-sky-400'));
+      const card = document.getElementById(`card-${idx}`);
+      if (card) card.classList.add('ring-2', 'ring-sky-400');
+    }
+
+    function setLsrFilter(cat) {
+      currentFilter = cat;
+      const btns = ['ALL', 'WIND', 'HAIL', 'FLOOD', 'TORNADO'];
+      btns.forEach(b => {
+        const btn = document.getElementById(`flt-${b}`);
+        if (btn) {
+          if (b === cat) {
+            btn.className = 'px-3 py-1 rounded-lg text-xs font-mono font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40';
+          } else {
+            btn.className = 'px-3 py-1 rounded-lg text-xs font-mono font-medium text-slate-400 hover:text-white border border-transparent';
+          }
+        }
+      });
+      renderReports();
+    }
+
+    async function fetchLSRs() {
+      try {
+        const res = await fetch(`https://mesonet.agron.iastate.edu/geojson/lsr.geojson?wfo=OKX&wfo=PHI&hours=24&t=${Date.now()}`);
+        if (!res.ok) throw new Error("LSR GeoJSON request failed");
+        const data = await res.json();
+        const features = data.features || [];
+
+        allReports = features.map(f => {
+          const p = f.properties || {};
+          const coords = f.geometry && f.geometry.coordinates ? f.geometry.coordinates : [0, 0];
+          const time = p.valid ? new Date(p.valid).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
+
+          return {
+            lat: coords[1],
+            lon: coords[0],
+            wfo: p.wfo || 'NWS',
+            type: p.typetext || p.type || 'STORM REPORT',
+            magnitude: p.magnitude || p.mag || '',
+            city: p.city || '',
+            county: p.county || '',
+            timeStr: time,
+            remark: p.remark || '',
+            hazard: getHazardDetails(p.typetext || p.type, p.magnitude || p.mag)
+          };
+        });
+
+        renderReports();
+      } catch (err) {
+        console.warn("LSR fetch error:", err);
+        renderReports();
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      fetchLSRs();
+    });
+
+    setInterval(fetchLSRs, 60000);
+  </script>
+</body>
+</html>

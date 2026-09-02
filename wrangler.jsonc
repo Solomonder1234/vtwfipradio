@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ern-vtwf",
+  "main": "ern-vtwf-worker/worker.js",
+  "compatibility_date": "2026-08-18",
+  "account_id": "be9d8ca7228beb465aa86179e789aa31",
+  "observability": {
+    "enabled": true
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ANNOUNCEMENTS", "class_name": "AnnouncementsDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AnnouncementsDO"] }],
+  "routes": [
+    { "pattern": "listentovtwfip.org", "custom_domain": true },
+    { "pattern": "www.listentovtwfip.org", "custom_domain": true },
+    { "pattern": "status.listentovtwfip.org", "custom_domain": true }
+  ],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "public",
+    "not_found_handling": "none",
+    "run_worker_first": true
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}

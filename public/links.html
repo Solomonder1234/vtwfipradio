@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Links — ERN / VTWF</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23ef4444'/><text x='50' y='68' font-size='38' font-weight='800' fill='white' text-anchor='middle' font-family='sans-serif'>ERN</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    html { background-color: #0f172a; }
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    
+    html { background-color: #0f172a; overflow-x: hidden; }
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root) {
+      animation: 0.8s ease-in-out both storm-exit;
+    }
+    ::view-transition-new(root) {
+      animation: 0.9s ease-in-out both storm-enter;
+    }
+    @keyframes storm-exit {
+      0% { opacity: 1; filter: brightness(1) contrast(1); }
+      30% { opacity: 0.9; filter: brightness(4) contrast(2) drop-shadow(0 0 45px #60a5fa); }
+      55% { opacity: 0.8; filter: brightness(1.6); }
+      75% { opacity: 0.95; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      100% { opacity: 0; filter: brightness(0.2); }
+    }
+    @keyframes storm-enter {
+      0% { opacity: 0; filter: brightness(5) contrast(2.2) drop-shadow(0 0 60px #93c5fd); }
+      30% { opacity: 0.85; filter: brightness(3.5) contrast(1.8); }
+      60% { opacity: 0.95; filter: brightness(2); }
+      85% { opacity: 1; filter: brightness(2.5) drop-shadow(0 0 30px #60a5fa); }
+      100% { opacity: 1; filter: brightness(1) contrast(1) drop-shadow(0 0 0 transparent); }
+    }
+
+    /* VISIBLE 6S RAIN CANVAS & OVERLAY */
+    #storm-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 99999;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      background: radial-gradient(circle at 50% 30%, rgba(96,165,250,0.15) 0%, rgba(11,15,25,0.6) 100%);
+    }
+    #storm-overlay.active { opacity: 1; }
+    #rain-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .lightning-flash {
+      position: absolute;
+      inset: 0;
+      background: rgba(219, 234, 254, 0.45);
+      mix-blend-mode: overlay;
+      opacity: 0;
+    }
+    .lightning-flash.strike-1 { animation: flash-strike 1.2s ease-out; }
+    @keyframes flash-strike {
+      0% { opacity: 0; }
+      8% { opacity: 1; }
+      20% { opacity: 0.2; }
+      30% { opacity: 0.95; }
+      55% { opacity: 0.15; }
+      75% { opacity: 0.8; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col">
+  <header class="sticky top-0 z-50 bg-slate-800/95 backdrop-blur border-b border-slate-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between py-3 flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center font-extrabold text-white text-sm shadow-lg shadow-red-900/30">ERN</div>
+          <div><h1 class="text-base sm:text-lg font-bold text-white leading-tight">EAS Relay Network</h1><p class="text-xs text-slate-400 font-mono">ERN / VTWF — New York City</p></div>
+        </div>
+        <nav class="flex items-center gap-1 sm:gap-2">
+          <a href="/" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Dashboard</a>
+          
+          <!-- Weather Operations Dropdown Menu -->
+          <div class="relative group">
+            <button class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition inline-flex items-center gap-1">
+              Weather Operations
+              <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div class="absolute left-0 mt-1 w-52 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1.5 hidden group-hover:block z-50">
+              <a href="/convective.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ⚡ Convective Hub
+              </a>
+              <a href="/reports.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                🌪️ Storm Reports
+              </a>
+              <a href="/observations.html" class="flex items-center gap-2 px-3.5 py-2 text-xs font-mono text-slate-300 hover:bg-slate-800 hover:text-white transition">
+                ✈️ Aviation &amp; Marine
+              </a>
+            </div>
+          </div>
+
+          <a href="/announcements.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition relative inline-flex items-center gap-1.5">Announcements <span id="announcement-nav-badge" class="hidden px-1.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full bg-red-600 text-white shadow-sm shadow-red-500/50 animate-pulse">!</span></a>
+          <a href="/about.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">About</a>
+          <a href="/links.html" class="px-3 py-1.5 text-sm font-medium text-green-400 rounded-lg bg-green-500/10">Links</a>
+          <a href="/settings.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Settings</a>
+          <a href="/login.html" class="px-3 py-1.5 text-sm font-medium text-slate-400 rounded-lg hover:text-white hover:bg-slate-700/50 transition">Admin</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+  <main class="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
+    <h2 class="text-2xl font-bold text-white mb-1">Official Links</h2>
+    <p class="text-sm text-slate-400 mb-8">Connect with the ERN / VTWF community and follow our updates.</p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <a href="https://icecast.gwes-eas.network/ERN-VTWF" target="_blank" rel="noopener noreferrer" class="group flex items-center gap-4 p-5 rounded-2xl bg-slate-800 border border-slate-700 hover:border-emerald-500/50 hover:bg-slate-800/80 transition-all shadow-lg hover:shadow-emerald-500/10">
+        <div class="flex-shrink-0 w-14 h-14 rounded-full bg-emerald-500 flex items-center justify-center text-white">
+          <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors">Primary Audio Stream</h3>
+          <p class="text-sm text-slate-400 mt-0.5 font-mono text-xs truncate">icecast.gwes-eas.network/ERN-VTWF</p>
+        </div>
+      </a>
+
+      <a href="http://radio.wjonip.org/wjonip" target="_blank" rel="noopener noreferrer" class="group flex items-center gap-4 p-5 rounded-2xl bg-slate-800 border border-slate-700 hover:border-amber-500/50 hover:bg-slate-800/80 transition-all shadow-lg hover:shadow-amber-500/10">
+        <div class="flex-shrink-0 w-14 h-14 rounded-full bg-amber-500 flex items-center justify-center text-white">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white group-hover:text-amber-400 transition-colors">Backup Station Audio (WJON-IP)</h3>
+          <p class="text-sm text-slate-400 mt-0.5 font-mono text-xs truncate">radio.wjonip.org/wjonip</p>
+        </div>
+      </a>
+
+      <a href="https://www.instagram.com/vtwfipradio?igsh=MTl2Z2g4YTZrYXNieA%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer" class="group flex items-center gap-4 p-5 rounded-2xl bg-slate-800 border border-slate-700 hover:border-pink-500/50 hover:bg-slate-800/80 transition-all shadow-lg hover:shadow-pink-500/10">
+        <div class="flex-shrink-0 w-14 h-14 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-500 flex items-center justify-center text-white">
+          <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">Instagram</h3>
+          <p class="text-sm text-slate-400 mt-0.5">Follow @vtwfipradio for updates</p>
+        </div>
+      </a>
+      
+      <a href="https://discord.gg/WNqJTHdrYb" target="_blank" rel="noopener noreferrer" class="group flex items-center gap-4 p-5 rounded-2xl bg-slate-800 border border-slate-700 hover:border-[#5865F2]/50 hover:bg-slate-800/80 transition-all shadow-lg hover:shadow-[#5865F2]/10">
+        <div class="flex-shrink-0 w-14 h-14 rounded-full bg-[#5865F2] flex items-center justify-center text-white">
+          <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 127.14 96.36"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1,105.25,105.25,0,0,0,32.19-16.14h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.31,60,73.31,53s5-12.74,11.43-12.74S96.2,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white group-hover:text-[#5865F2] transition-colors">Station Discord Server</h3>
+          <p class="text-sm text-slate-400 mt-0.5">Join the community discussion</p>
+        </div>
+      </a>
+    </div>
+  </main>
+  </footer>
+  <script>
+    // ===== LIVE ANNOUNCEMENTS BADGE SYNC =====
+    async function checkAnnouncementsBadge() {
+      const badge = document.getElementById('announcement-nav-badge');
+      if (!badge) return;
+      try {
+        const res = await fetch('/api/announcements', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const hasEmergency = data.some(a => a.priority === 'EMERGENCY');
+          const hasWarning = data.some(a => a.priority === 'WARNING');
+          badge.textContent = data.length > 1 ? `${data.length}` : '!';
+          badge.className = 'px-1.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full text-white shadow-sm animate-pulse ' + 
+            (hasEmergency ? 'bg-red-600 shadow-red-500/50' : (hasWarning ? 'bg-amber-600 shadow-amber-500/50' : 'bg-blue-600 shadow-blue-500/50'));
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      } catch(e) {}
+    }
+    checkAnnouncementsBadge();
+    setInterval(checkAnnouncementsBadge, 5000);
+
+    // ===== SYNCHRONIZED 6-SECOND THUNDERSTORM CANVAS & AUDIO =====
+    const overlay = document.createElement('div');
+    overlay.id = 'storm-overlay';
+    overlay.innerHTML = '<canvas id="rain-canvas"></canvas><div class="lightning-flash" id="flash-div"></div>';
+    document.body.appendChild(overlay);
+
+    const canvas = document.getElementById('rain-canvas');
+    const fDiv = document.getElementById('flash-div');
+    let ctx2D = null;
+    let rainDrops = [];
+    let rainAnimId = null;
+
+    function resizeRainCanvas() {
+      if (!canvas) return;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeRainCanvas);
+    resizeRainCanvas();
+
+    function initRain() {
+      rainDrops = [];
+      const numDrops = Math.floor((window.innerWidth * window.innerHeight) / 1000);
+      for (let i = 0; i < numDrops; i++) {
+        rainDrops.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          l: Math.random() * 30 + 15,
+          v: Math.random() * 20 + 24,
+          o: Math.random() * 0.4 + 0.3
+        });
+      }
+    }
+
+    function drawRain() {
+      if (!ctx2D) ctx2D = canvas.getContext('2d');
+      ctx2D.clearRect(0, 0, canvas.width, canvas.height);
+      ctx2D.strokeStyle = 'rgba(186, 230, 253, 0.7)';
+      ctx2D.lineWidth = 1.5;
+      ctx2D.beginPath();
+      for (let i = 0; i < rainDrops.length; i++) {
+        const d = rainDrops[i];
+        ctx2D.moveTo(d.x, d.y);
+        ctx2D.lineTo(d.x - 3, d.y + d.l);
+        d.y += d.v;
+        d.x -= 3;
+        if (d.y > canvas.height) {
+          d.y = -d.l;
+          d.x = Math.random() * (canvas.width + 100);
+        }
+      }
+      ctx2D.stroke();
+      rainAnimId = requestAnimationFrame(drawRain);
+    }
+
+    function triggerStormVisuals(remainingTime = 5000) {
+      resizeRainCanvas();
+      initRain();
+      overlay.classList.add('active');
+      fDiv.classList.remove('strike-1');
+      void fDiv.offsetWidth;
+      fDiv.classList.add('strike-1');
+      if (rainAnimId) cancelAnimationFrame(rainAnimId);
+      drawRain();
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+          if (rainAnimId) cancelAnimationFrame(rainAnimId);
+        }, 500);
+      }, remainingTime);
+    }
+
+    let globalAudioCtx = null;
+    function playThunderstormAudio(startOffset = 0) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!globalAudioCtx || globalAudioCtx.state === 'closed') {
+          globalAudioCtx = new AudioContext();
+        }
+        const ctx = globalAudioCtx;
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const duration = 5.0; // 2s before switch + 3s after switch
+        const remaining = Math.max(0.5, duration - startOffset);
+
+        // 1. Rain Layer
+        const rainBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const rainBuffer = ctx.createBuffer(2, rainBufferSize, ctx.sampleRate);
+        const rL = rainBuffer.getChannelData(0);
+        const rR = rainBuffer.getChannelData(1);
+        for (let i = 0; i < rainBufferSize; i++) {
+          rL[i] = (Math.random() * 2 - 1) * 0.2;
+          rR[i] = (Math.random() * 2 - 1) * 0.2;
+        }
+        const rainSource = ctx.createBufferSource();
+        rainSource.buffer = rainBuffer;
+        const rainFilter = ctx.createBiquadFilter();
+        rainFilter.type = 'bandpass';
+        rainFilter.frequency.setValueAtTime(1600, ctx.currentTime);
+        rainFilter.Q.setValueAtTime(0.6, ctx.currentTime);
+
+        const rainGain = ctx.createGain();
+        rainGain.gain.setValueAtTime(0.01, ctx.currentTime);
+        rainGain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.15);
+        rainGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining);
+
+        rainSource.connect(rainFilter);
+        rainFilter.connect(rainGain);
+        rainGain.connect(ctx.destination);
+        rainSource.start();
+        rainSource.stop(ctx.currentTime + remaining);
+
+        // 2. Thunderclap & Rolling Rumble Layer
+        const thunderBufferSize = Math.floor(ctx.sampleRate * remaining);
+        const thunderBuffer = ctx.createBuffer(2, thunderBufferSize, ctx.sampleRate);
+        const tL = thunderBuffer.getChannelData(0);
+        const tR = thunderBuffer.getChannelData(1);
+        let l0 = 0, l1 = 0, l2 = 0;
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < thunderBufferSize; i++) {
+          const wL = Math.random() * 2 - 1;
+          const wR = Math.random() * 2 - 1;
+          l0 = 0.994 * l0 + wL * 0.05;
+          l1 = 0.96 * l1 + wL * 0.1;
+          l2 = 0.86 * l2 + wL * 0.25;
+          tL[i] = (l0 + l1 + l2) * 0.55;
+
+          b0 = 0.994 * b0 + wR * 0.05;
+          b1 = 0.96 * b1 + wR * 0.1;
+          b2 = 0.86 * b2 + wR * 0.25;
+          tR[i] = (b0 + b1 + b2) * 0.55;
+        }
+
+        const thunderSource = ctx.createBufferSource();
+        thunderSource.buffer = thunderBuffer;
+
+        const thunderFilter = ctx.createBiquadFilter();
+        thunderFilter.type = 'lowpass';
+        thunderFilter.frequency.setValueAtTime(Math.max(40, 360 - startOffset * 40), ctx.currentTime);
+        thunderFilter.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + remaining);
+
+        const thunderGain = ctx.createGain();
+        if (startOffset <= 0.1) {
+          thunderGain.gain.setValueAtTime(0.01, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.95, ctx.currentTime + 0.05); // Strike
+          thunderGain.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 0.25);
+          thunderGain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 0.55); // Loud clap
+          thunderGain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 1.2);
+          thunderGain.gain.linearRampToValueAtTime(0.65, ctx.currentTime + 1.9); // Secondary rumble at switch
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 3.5);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        } else {
+          thunderGain.gain.setValueAtTime(0.65, ctx.currentTime);
+          thunderGain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.3);
+          thunderGain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 1.8);
+          thunderGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + remaining - 0.1);
+        }
+
+        thunderSource.connect(thunderFilter);
+        thunderFilter.connect(thunderGain);
+        thunderGain.connect(ctx.destination);
+        thunderSource.start();
+        thunderSource.stop(ctx.currentTime + remaining);
+      } catch(e) {}
+    }
+
+    // 2s / 3s ratio: 2000ms storm before navigation redirect, 3000ms storm remaining on incoming page
+    document.querySelectorAll('a[href]').forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && !href.startsWith('http') && !href.startsWith('#') && !link.hasAttribute('target')) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          sessionStorage.setItem('ern_storm_start', Date.now());
+          triggerStormVisuals(5000);
+          playThunderstormAudio(0);
+          setTimeout(() => {
+            window.location.href = href;
+          }, 2000);
+        });
+      }
+    });
+
+    (function checkStormResume() {
+      const start = sessionStorage.getItem('ern_storm_start');
+      if (start) {
+        const elapsed = (Date.now() - parseInt(start, 10)) / 1000;
+        sessionStorage.removeItem('ern_storm_start');
+        if (elapsed < 4.8) {
+          const remainingMs = Math.max(500, Math.floor((5.0 - elapsed) * 1000));
+          triggerStormVisuals(remainingMs);
+          playThunderstormAudio(elapsed);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
