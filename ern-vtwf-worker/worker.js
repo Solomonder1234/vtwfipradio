@@ -171,7 +171,7 @@ export default {
             const statusData = await statusRes.json();
             if (statusData && statusData.status === 'OFFLINE') {
               // Check if user has active admin session to bypass maintenance screen
-              const auth = checkAuth(request, clientIp);
+              const auth = await checkAuth(request, clientIp, env);
               if (!auth.ok) {
                 return new Response(MAINTENANCE_HTML, {
                   status: 503,
@@ -193,10 +193,15 @@ export default {
       const body = await request.json();
       const email = (body.email || '').toLowerCase().trim();
       const passcode = (body.passcode || '').trim();
-      const validUsernames = ['vtwfipradio', 'solomonder1234@gmail.com', 'admin@vtwfip.org'];
-      if (validUsernames.includes(email) && passcode.toLowerCase() === 'lakota1234') {
-        const token = btoa(`${email}:${Date.now()}:ern-admin:${clientIp}`);
-        // Register this IP in the Durable Object as the authorized admin IP
+      const allowedEmails = getAllowedAdminEmails(env);
+      const configuredPasscode = (env.ADMIN_PASSCODE || '').trim();
+
+      if (!allowedEmails.length || !configuredPasscode) {
+        return json({ success: false, error: 'Admin login is not configured on this worker.' }, 500);
+      }
+
+      if (allowedEmails.includes(email) && passcode === configuredPasscode) {
+        const token = await createAdminSessionToken(email, clientIp, env);
         await stub.fetch(new Request('https://do/register-ip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -208,7 +213,7 @@ export default {
     }
 
     if (url.pathname === '/api/verify-session' && request.method === 'POST') {
-      const auth = checkAuth(request, clientIp);
+      const auth = await checkAuth(request, clientIp, env);
       if (!auth.ok) return json({ ok: false, error: 'Unauthorized' }, 401);
       await stub.fetch(new Request('https://do/register-ip', {
         method: 'POST',
@@ -223,7 +228,7 @@ export default {
     }
 
     if (url.pathname === '/api/announcements' && request.method === 'POST') {
-      const auth = checkAuth(request, clientIp);
+      const auth = await checkAuth(request, clientIp, env);
       if (!auth.ok) return json({ success: false, error: 'Unauthorized IP or Token' }, 401);
 
       // Verify with Durable Object IP registry
@@ -238,12 +243,15 @@ export default {
 
       const body = await request.json();
 
-      // Post to Discord Webhook from Server Worker (bypasses browser CORS & privacy shields)
+      // Post to Discord Webhook from the secure server-side worker so browser clients never see the secret URL.
       let discordResult = null;
       let discordMessageId = null;
       try {
-        const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1539383686993023028/Q7x4V3a6C_trfuRKOAo024dvldB75WtFbFrWbzd8fYyaVI1da-aYHt4h5ZJI8vR3wSMN";
-        const PING_ID = "1539556475683340318";
+        const DISCORD_WEBHOOK = getDiscordWebhook(env);
+        const PING_ID = getDiscordPingRoleId(env);
+        if (!DISCORD_WEBHOOK || !PING_ID) {
+          throw new Error('Discord webhook configuration is missing. Set DISCORD_WEBHOOK_URL and DISCORD_PING_ID as Cloudflare secrets.');
+        }
         
         const priorityColors = {
           'NOTICE': 2067276,      // Cyan #1fb6ff
@@ -308,7 +316,7 @@ export default {
     }
 
     if (url.pathname === '/api/announcements' && (request.method === 'PUT' || request.method === 'PATCH')) {
-      const auth = checkAuth(request, clientIp);
+      const auth = await checkAuth(request, clientIp, env);
       if (!auth.ok) return json({ success: false, error: 'Unauthorized IP or Token' }, 401);
 
       // Verify with Durable Object IP registry
@@ -339,7 +347,10 @@ export default {
       let discordResult = null;
       let targetMessageId = ann ? ann.discordMessageId : null;
 
-      const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1539383686993023028/Q7x4V3a6C_trfuRKOAo024dvldB75WtFbFrWbzd8fYyaVI1da-aYHt4h5ZJI8vR3wSMN";
+      const DISCORD_WEBHOOK = getDiscordWebhook(env);
+      if (!DISCORD_WEBHOOK) {
+        return json({ success: false, error: 'Discord webhook configuration is missing.' }, 500);
+      }
       const priorityColors = {
         'NOTICE': 2067276,      // Cyan #1fb6ff
         'TEST': 2278750,        // Green #22c55e
@@ -392,7 +403,10 @@ export default {
       // 2. Fallback: If PATCH wasn't successful or discordMessageId was missing, post message & capture message ID
       if (!patchOk) {
         try {
-          const PING_ID = "1539556475683340318";
+          const PING_ID = getDiscordPingRoleId(env);
+          if (!PING_ID) {
+            throw new Error('Discord ping role ID is missing. Set DISCORD_PING_ID as a Cloudflare secret.');
+          }
           const discordPayload = {
             content: `<@&${PING_ID}>`,
             allowed_mentions: { roles: [PING_ID] },
@@ -441,7 +455,7 @@ export default {
     }
 
     if (url.pathname === '/api/announcements' && request.method === 'DELETE') {
-      const auth = checkAuth(request, clientIp);
+      const auth = await checkAuth(request, clientIp, env);
       if (!auth.ok) return json({ success: false, error: 'Unauthorized' }, 401);
 
       // Verify with Durable Object IP registry
@@ -461,7 +475,10 @@ export default {
       let discordResult = null;
       if (doData.discordMessageId) {
         try {
-          const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1539383686993023028/Q7x4V3a6C_trfuRKOAo024dvldB75WtFbFrWbzd8fYyaVI1da-aYHt4h5ZJI8vR3wSMN";
+          const DISCORD_WEBHOOK = getDiscordWebhook(env);
+          if (!DISCORD_WEBHOOK) {
+            throw new Error('Discord webhook configuration is missing.');
+          }
           const dRes = await fetch(`${DISCORD_WEBHOOK}/messages/${doData.discordMessageId}`, {
             method: "DELETE",
             headers: {
@@ -474,6 +491,68 @@ export default {
         }
       }
       return json({ ...doData, discord: discordResult });
+    }
+
+    if (url.pathname === '/api/weather/current' && request.method === 'GET') {
+      const apiKey = env.OPENWEATHER_API_KEY;
+      if (!apiKey) return json({ error: 'Weather API key is not configured on the worker.' }, 500);
+
+      const lat = url.searchParams.get('lat') || '40.7128';
+      const lon = url.searchParams.get('lon') || '-74.0060';
+      const units = url.searchParams.get('units') || 'imperial';
+
+      const openWeatherUrl = new URL('https://api.openweathermap.org/data/2.5/weather');
+      openWeatherUrl.searchParams.set('lat', lat);
+      openWeatherUrl.searchParams.set('lon', lon);
+      openWeatherUrl.searchParams.set('units', units);
+      openWeatherUrl.searchParams.set('appid', apiKey);
+
+      try {
+        const weatherRes = await fetch(openWeatherUrl.toString(), {
+          headers: { 'User-Agent': 'ERN-VTWF-Weather/1.0' },
+          cf: { cacheTtl: 120 }
+        });
+        if (!weatherRes.ok) {
+          return json({ error: 'OpenWeatherMap request failed' }, weatherRes.status);
+        }
+        const payload = await weatherRes.json();
+        return json(payload, 200, { 'Cache-Control': 'public, max-age=120, s-maxage=120' });
+      } catch (err) {
+        return json({ error: err.message }, 502);
+      }
+    }
+
+    if (url.pathname === '/api/weather/radar' && request.method === 'GET') {
+      const apiKey = env.OPENWEATHER_API_KEY;
+      if (!apiKey) return json({ error: 'Weather API key is not configured on the worker.' }, 500);
+
+      const layer = ['precipitation_new', 'clouds_new', 'wind_new', 'temp_new'].includes(url.searchParams.get('layer') || '')
+        ? (url.searchParams.get('layer') || 'precipitation_new')
+        : 'precipitation_new';
+      const x = url.searchParams.get('x') || '0';
+      const y = url.searchParams.get('y') || '0';
+      const z = url.searchParams.get('z') || '0';
+      const tileUrl = `https://tile.openweathermap.org/map/${layer}/${z}/${x}/${y}.png?appid=${apiKey}`;
+
+      try {
+        const tileRes = await fetch(tileUrl, {
+          headers: { 'User-Agent': 'ERN-VTWF-Radar/1.0' },
+          cf: { cacheTtl: 300 }
+        });
+        if (!tileRes.ok) {
+          return json({ error: 'OpenWeatherMap tile request failed' }, tileRes.status);
+        }
+        return new Response(tileRes.body, {
+          status: tileRes.status,
+          headers: {
+            'Content-Type': tileRes.headers.get('Content-Type') || 'image/png',
+            'Cache-Control': 'public, max-age=300, s-maxage=300',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (err) {
+        return json({ error: err.message }, 502);
+      }
     }
 
     if (url.pathname === '/api/status' && request.method === 'GET') {
@@ -504,7 +583,7 @@ export default {
     }
 
     if (url.pathname === '/api/status' && request.method === 'POST') {
-      const auth = checkAuth(request, clientIp);
+      const auth = await checkAuth(request, clientIp, env);
       if (!auth.ok) return json({ success: false, error: 'Unauthorized' }, 401);
 
       // Verify with Durable Object IP registry
@@ -1001,6 +1080,97 @@ export default {
   }
 };
 
+function parseCsvList(value) {
+  return (value || '')
+    .split(',')
+    .map(item => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function getAllowedAdminEmails(env) {
+  return parseCsvList(env.ADMIN_EMAILS);
+}
+
+function getSessionSecret(env) {
+  return env.ADMIN_SESSION_SECRET || env.SESSION_SECRET || '';
+}
+
+function getDiscordWebhook(env) {
+  return env.DISCORD_WEBHOOK_URL || '';
+}
+
+function getDiscordPingRoleId(env) {
+  return env.DISCORD_PING_ID || '';
+}
+
+function toBase64Url(value) {
+  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function fromBase64Url(value) {
+  const base64 = (value || '').replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, ch => ch.charCodeAt(0));
+}
+
+async function signPayload(payload, secret) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const body = new TextEncoder().encode(JSON.stringify(payload));
+  const signature = await crypto.subtle.sign('HMAC', key, body);
+  return toBase64Url(new Uint8Array(signature));
+}
+
+async function createAdminSessionToken(email, clientIp, env) {
+  const secret = getSessionSecret(env);
+  if (!secret) throw new Error('Missing ADMIN_SESSION_SECRET');
+
+  const payload = {
+    email,
+    role: 'ern-admin',
+    iat: Date.now(),
+    exp: Date.now() + (60 * 60 * 1000),
+    ip: clientIp
+  };
+
+  const signature = await signPayload(payload, secret);
+  return `${toBase64Url(JSON.stringify(payload))}.${signature}`;
+}
+
+async function verifyAdminSessionToken(token, env, clientIp) {
+  if (!token || typeof token !== 'string') return { ok: false };
+
+  const [payloadPart, signature] = token.split('.');
+  if (!payloadPart || !signature) return { ok: false };
+
+  const secret = getSessionSecret(env);
+  if (!secret) return { ok: false };
+
+  try {
+    const payloadJson = new TextDecoder().decode(fromBase64Url(payloadPart));
+    const payload = JSON.parse(payloadJson);
+    const expectedSignature = await signPayload(payload, secret);
+    if (expectedSignature !== signature) return { ok: false };
+
+    if (payload.role !== 'ern-admin') return { ok: false };
+    if (payload.exp && Date.now() > payload.exp) return { ok: false };
+    if (payload.ip && payload.ip !== clientIp) return { ok: false };
+
+    return { ok: true, email: payload.email };
+  } catch {
+    return { ok: false };
+  }
+}
+
 function json(data, status = 200, customHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -1012,17 +1182,9 @@ function json(data, status = 200, customHeaders = {}) {
     }
   });
 }
-function checkAuth(request, clientIp) {
+
+async function checkAuth(request, clientIp, env) {
   const auth = request.headers.get('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) return { ok: false };
-  try {
-    const decoded = atob(auth.replace('Bearer ', ''));
-    if (!decoded.includes(':ern-admin')) return { ok: false };
-    const parts = decoded.split(':');
-    const validUsernames = ['vtwfipradio', 'solomonder1234@gmail.com', 'admin@vtwfip.org'];
-    if (!parts[0] || !validUsernames.includes(parts[0].toLowerCase())) return { ok: false };
-    return { ok: true, email: parts[0] };
-  } catch {
-    return { ok: false };
-  }
+  return verifyAdminSessionToken(auth.replace('Bearer ', '').trim(), env, clientIp);
 }

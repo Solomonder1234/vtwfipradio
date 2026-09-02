@@ -2806,7 +2806,6 @@
     // ===== LIVE DOPPLER RADAR (MAPBOX + OPENWEATHERMAP) =====
     (function initRadarMap() {
       const MAPBOX_TOKEN = ['pk', 'eyJ1IjoidGhlZ3Jpbm5lcnd4IiwiYSI6ImNtOHJya3E4ZTA5ajkybHB3NTJzeGp0c3cifQ', 'pY7gpDgk4Ma9L_LddwjgDg'].join('.');
-      const OWM_API_KEY = '8bcd9678a11c455ba9223b2328f999f6';
       const NYC_COORDS = [-74.0060, 40.7128]; // [lng, lat]
       
       const mapContainer = document.getElementById('radar-map');
@@ -2840,7 +2839,7 @@
         if (layer === 'nexrad') {
           return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png?${cacheBuster}`;
         }
-        return `https://tile.openweathermap.org/map/${layer}/{z}/{x}/{y}.png?appid=${OWM_API_KEY}&${cacheBuster}`;
+        return `/api/weather/radar?layer=${encodeURIComponent(layer)}&z={z}&x={x}&y={y}&${cacheBuster}`;
       }
 
       function reloadRadarTiles() {
@@ -3221,10 +3220,9 @@
     }
 
     async function fetchNycWeatherTelemetry() {
-      const OWM_API_KEY = '8bcd9678a11c455ba9223b2328f999f6';
       const s = getUserSettings();
       try {
-        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=40.7128&lon=-74.0060&units=imperial&appid=${OWM_API_KEY}`);
+        const res = await fetch('/api/weather/current?lat=40.7128&lon=-74.0060&units=imperial');
         if (!res.ok) return;
         const d = await res.json();
         

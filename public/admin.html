@@ -301,43 +301,31 @@
     if (!token) { 
       window.location.href = '/login.html'; 
     } else { 
-      try { 
-        const decoded = atob(token); 
-        if (!decoded.includes(':ern-admin')) { 
-          window.location.href = '/login.html'; 
-        } else { 
-          // Verify session and client IP with backend worker
-          fetch('/api/verify-session', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token }
-          }).then(res => {
-            if (!res.ok) {
-              console.warn("Unauthorized IP address or expired admin session.");
-              localStorage.removeItem('ern_admin_token');
-              sessionStorage.removeItem('ern_admin_token');
-              window.location.href = '/login.html';
-            } else {
-              localStorage.setItem('ern_admin_token', token);
-              sessionStorage.setItem('ern_admin_token', token);
-              authGate.classList.add('hidden'); 
-              consoleEl.classList.remove('hidden');
-            }
-          }).catch(() => {
-            // Offline/fallback check
-            authGate.classList.add('hidden'); 
-            consoleEl.classList.remove('hidden');
-          });
-        } 
-      } catch { 
-        window.location.href = '/login.html'; 
-      } 
+      fetch('/api/verify-session', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token }
+      }).then(res => {
+        if (!res.ok) {
+          console.warn("Unauthorized IP address or expired admin session.");
+          localStorage.removeItem('ern_admin_token');
+          sessionStorage.removeItem('ern_admin_token');
+          window.location.href = '/login.html';
+        } else {
+          localStorage.setItem('ern_admin_token', token);
+          sessionStorage.setItem('ern_admin_token', token);
+          authGate.classList.add('hidden'); 
+          consoleEl.classList.remove('hidden');
+        }
+      }).catch(() => {
+        authGate.classList.add('hidden'); 
+        consoleEl.classList.remove('hidden');
+      });
     }
     document.getElementById('logout-btn').addEventListener('click', () => { 
       localStorage.removeItem('ern_admin_token');
       sessionStorage.removeItem('ern_admin_token'); 
       window.location.href = '/login.html'; 
     });
-    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1539383686993023028/Q7x4V3a6C_trfuRKOAo024dvldB75WtFbFrWbzd8fYyaVI1da-aYHt4h5ZJI8vR3wSMN";
     const STORAGE_KEY = 'ern_announcements';
     let loadedAnnouncements = [];
     let editingAnnouncementId = null;
@@ -805,7 +793,7 @@
           }},
           { name: "Weather Radar Tiles", test: async () => {
             const start = performance.now();
-            const res = await fetch("https://tile.openweathermap.org/map/precipitation_new/6/19/24.png?appid=8bcd9678a11c455ba9223b2328f999f6", { cache: "no-store" });
+            const res = await fetch("/api/weather/radar?layer=precipitation_new&z=6&x=19&y=24", { cache: "no-store" });
             const lat = Math.round(performance.now() - start);
             if (res.ok) return { ok: true, msg: `Tile Feed OK (${lat}ms)`, detail: "Radar Ready" };
             throw new Error(`HTTP ${res.status}`);

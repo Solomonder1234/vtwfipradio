@@ -108,15 +108,10 @@
     </div>
   </footer>
   <script>
-    // Auto-redirect to admin if already authenticated in this browser
+    // Auto-redirect to admin if a valid client session already exists.
     const existingToken = localStorage.getItem('ern_admin_token') || sessionStorage.getItem('ern_admin_token');
     if (existingToken) {
-      try {
-        const decoded = atob(existingToken);
-        if (decoded.includes(':ern-admin')) {
-          window.location.href = '/admin.html';
-        }
-      } catch(e) {}
+      window.location.href = '/admin.html';
     }
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -138,14 +133,7 @@
           document.getElementById('error-msg').classList.remove('hidden'); 
         }
       } catch (err) {
-        if (email.toLowerCase() === 'solomonder1234@gmail.com' && passcode === 'Lakota1234') { 
-          const token = btoa(email + ':' + Date.now() + ':ern-admin'); 
-          localStorage.setItem('ern_admin_token', token);
-          sessionStorage.setItem('ern_admin_token', token); 
-          window.location.href = '/admin.html'; 
-        } else { 
-          document.getElementById('error-msg').classList.remove('hidden'); 
-        }
+        document.getElementById('error-msg').classList.remove('hidden');
       }
     });
 
